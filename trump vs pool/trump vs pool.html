@@ -1,1 +1,642 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Трамп vs Бассейн</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root{
+    --pool-blue:#1D6FA5;
+    --algae-green:#4C7A2E;
+    --marble:#E8E2D0;
+    --marble-dark:#d3cbb0;
+    --brass:#C9A227;
+    --alert:#B33A3A;
+    --ink:#151C24;
+    --ink-2:#1F2A36;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; height:100%; background:var(--ink); color:var(--marble);
+    font-family:'Space Mono',ui-monospace,'Courier New',monospace;
+    overflow:hidden; -webkit-tap-highlight-color:transparent;
+  }
+  #app{ display:flex; flex-direction:column; height:100%; height:100dvh; }
+
+  /* ticker */
+  .ticker{ background:var(--ink-2); border-bottom:2px solid var(--brass); overflow:hidden; white-space:nowrap; padding:6px 0; flex:0 0 auto; }
+  .ticker-track{ display:inline-block; padding-left:100%; animation: scroll-left 34s linear infinite; }
+  .ticker-track span{ margin-right:3em; font-size:.7rem; letter-spacing:.03em; color:#E9DEC0; }
+  .ticker-track span b{ color:var(--brass); }
+  @keyframes scroll-left{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce){ .ticker-track{ animation-duration:120s; } }
+
+  /* hud */
+  .hud{ display:flex; gap:.5rem; justify-content:space-between; align-items:center; padding:.45rem .6rem;
+        font-family:'Oswald',Impact,sans-serif; flex:0 0 auto; border-bottom:3px solid var(--brass); background:var(--ink); }
+  .hud .stat{ display:flex; flex-direction:column; align-items:center; min-width:0; flex:1; }
+  .hud .stat b{ font-size:.95rem; letter-spacing:.01em; white-space:nowrap; }
+  .hud .stat small{ font-family:'Space Mono',monospace; font-size:.56rem; opacity:.65; text-transform:uppercase; letter-spacing:.05em; }
+
+  /* stage */
+  .stage-wrap{ position:relative; flex:1 1 auto; margin:.45rem; border-radius:10px; overflow:hidden;
+    border:9px solid var(--marble);
+    background-image: repeating-linear-gradient(45deg, var(--marble) 0 10px, var(--marble-dark) 10px 20px);
+    box-shadow: inset 0 0 0 2px #00000022;
+  }
+  .stage-wrap.shake{ animation: shake .4s; }
+  @keyframes shake{ 10%,90%{transform:translateX(-1px);} 20%,80%{transform:translateX(2px);}
+    30%,50%,70%{transform:translateX(-5px);} 40%,60%{transform:translateX(5px);} }
+  @media (prefers-reduced-motion: reduce){ .stage-wrap.shake{ animation:none; } }
+
+  canvas{ display:block; width:100%; height:100%; touch-action:none; cursor:none; }
+
+  .legend{ display:flex; gap:1rem; justify-content:center; padding:.28rem .5rem; font-size:.64rem; opacity:.75; flex:0 0 auto; }
+
+  .btnbar{ display:flex; gap:.6rem; align-items:center; justify-content:center;
+    padding:.45rem .75rem calc(.55rem + env(safe-area-inset-bottom)); flex:0 0 auto; background:var(--ink); }
+  button{ font-family:'Oswald',Impact,sans-serif; font-size:.85rem; letter-spacing:.03em; text-transform:uppercase;
+    background:var(--brass); color:var(--ink); border:none; border-radius:8px; padding:.75rem 1.2rem;
+    cursor:pointer; min-height:44px; }
+  button:active{ transform:translateY(1px); }
+  button:disabled{ background:#5b5647; color:#a9a48f; cursor:default; }
+  button:focus-visible{ outline:3px solid #fff; outline-offset:2px; }
+
+  /* overlays */
+  .overlay{ position:absolute; inset:0; z-index:2; background:rgba(10,14,18,.94); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:1.4rem; gap:.7rem; overflow:auto; }
+  .overlay.hidden{ display:none; }
+  .overlay h1{ font-family:'Oswald',Impact,sans-serif; font-size:1.5rem; margin:0; text-transform:uppercase; letter-spacing:.02em; }
+  .overlay p{ margin:0; max-width:30em; line-height:1.5; font-size:.82rem; opacity:.92; }
+  .overlay .rules{ text-align:left; font-size:.76rem; line-height:1.75; background:#0000003d;
+    border:1px solid #ffffff22; border-radius:8px; padding:.7rem .9rem; max-width:30em; }
+  .overlay .stats{ font-family:'Space Mono',monospace; font-size:.82rem; line-height:1.95; }
+  .overlay .stats b{ color:var(--brass); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="ticker"><div class="ticker-track" id="tickerTrack"></div></div>
+
+  <div class="hud">
+    <div class="stat"><b id="hudBudget">$14,000,000</b><small>Бюджет</small></div>
+    <div class="stat"><b id="hudTime">00:00</b><small>Время</small></div>
+    <div class="stat"><b id="hudAlgae">2%</b><small>Водоросли</small></div>
+    <div class="stat"><b id="hudCaught">0</b><small>Поймано</small></div>
+  </div>
+
+  <div class="stage-wrap" id="stageWrap">
+    <canvas id="game"></canvas>
+
+    <div class="overlay" id="startOverlay">
+      <h1>Трамп vs Бассейн</h1>
+      <p>$14&nbsp;000&nbsp;000, свежая синяя краска и до неприличия упрямые водоросли. Отражающий бассейн у мемориала Линкольна снова зеленеет — не дай ему победить.</p>
+      <div class="rules">
+        🖱️ / 👆 Зажми и води по воде — оттираешь водоросли<br>
+        🦹 Тапни по диверсанту, пока он не добежал — прогонишь его<br>
+        📸 Тапни по туристу — не даст отколоть плитку на сувенир<br>
+        🧪 Кнопка «Реагент» (или пробел) — экстренная чистка всего бассейна, но недёшево<br>
+        Не дай зелени затянуть больше ~70% воды
+      </div>
+      <button id="startBtn">Начать уборку</button>
+    </div>
+
+    <div class="overlay hidden" id="endOverlay">
+      <h1 id="endTitle">Бассейн победил 🌿</h1>
+      <p id="endFlavor"></p>
+      <div class="stats" id="endStats"></div>
+      <button id="restartBtn">Играть снова</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span>🦹 диверсант</span><span>📸 турист</span><span>🧪 реагент = space</span>
+  </div>
+
+  <div class="btnbar">
+    <button id="reagentBtn">🧪 Реагент</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- config ----------
+  const CONFIG = {
+    GRID_W: 42, GRID_H: 24,
+    GROWTH_BASE: 0.028,
+    DIFFICULTY_RAMP: 45,
+    CLEAN_RADIUS_CELLS: 3.0,
+    CLEAN_RATE: 2.1,
+    VANDAL_SPAWN_MIN: 5.0, VANDAL_SPAWN_MAX: 8.0,
+    VANDAL_DUMP_RADIUS: 2.1, VANDAL_DUMP_AMOUNT: 1.0,
+    VANDAL_TRAVEL_MIN: 2.0, VANDAL_TRAVEL_MAX: 3.0,
+    TOURIST_SPAWN_MIN: 6.5, TOURIST_SPAWN_MAX: 10.5,
+    TOURIST_TRAVEL_MIN: 1.6, TOURIST_TRAVEL_MAX: 2.4,
+    TOURIST_CHIP_COST: 50000,
+    TOURIST_ALGAE_BUMP: 0.14, TOURIST_BUMP_RADIUS: 1.0,
+    REAGENT_RELIEF: 0.42, REAGENT_COOLDOWN: 15,
+    REAGENT_COST: 250000,
+    LOSE_THRESHOLD: 0.72,
+    WIN_TIME: 90,
+    START_BUDGET: 14000000,
+    CATCH_RADIUS_CELLS: 2.0
+  };
+  const GRID_W = CONFIG.GRID_W, GRID_H = CONFIG.GRID_H;
+  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- dom ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha:false });
+  const stageWrap = document.getElementById('stageWrap');
+  const startOverlay = document.getElementById('startOverlay');
+  const endOverlay = document.getElementById('endOverlay');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const reagentBtn = document.getElementById('reagentBtn');
+  const hudBudget = document.getElementById('hudBudget');
+  const hudTime = document.getElementById('hudTime');
+  const hudAlgae = document.getElementById('hudAlgae');
+  const hudCaught = document.getElementById('hudCaught');
+  const endTitle = document.getElementById('endTitle');
+  const endFlavor = document.getElementById('endFlavor');
+  const endStats = document.getElementById('endStats');
+
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = GRID_W; offCanvas.height = GRID_H;
+  const offCtx = offCanvas.getContext('2d');
+  const offImg = offCtx.createImageData(GRID_W, GRID_H);
+
+  // ---------- ticker content ----------
+  const TICKER_ITEMS = [
+    "ОФИЦИАЛЬНО: ремонт Отражающего бассейна обошёлся в <b>$14 000 000</b>",
+    "БАССЕЙН ПЕРЕКРАСИЛИ В СИНИЙ — ЧЕРЕЗ НЕДЕЛЮ ОН СНОВА ЗЕЛЁНЫЙ",
+    "ВЕРСИЯ №1: во всём виноваты диверсанты",
+    "ВЕРСИЯ №2 (учёные): тёплая стоячая вода — и водоросли неизбежны",
+    "ОХРАНУ УСИЛИЛИ: и от вандалов, и от охотников за сувенирами",
+    "ТРЕВОГА: коды <b>86</b> и <b>47</b> замечены на месте происшествия",
+    "РЕАГЕНТ ПРОТИВ ВОДОРОСЛЕЙ ПОВРЕДИЛ СВЕЖУЮ КРАСКУ",
+    "ДО 250-ЛЕТИЯ США БАССЕЙН ДОЛЖЕН ОСТАВАТЬСЯ ГОЛУБЫМ"
+  ];
+  const tickerTrack = document.getElementById('tickerTrack');
+  const tickerHtml = TICKER_ITEMS.map(t => `<span>${t}</span>`).join('');
+  tickerTrack.innerHTML = tickerHtml + tickerHtml;
+
+  // ---------- state ----------
+  let algae = new Float32Array(GRID_W*GRID_H);
+  let damaged = new Float32Array(GRID_W*GRID_H);
+  let noise = new Float32Array(GRID_W*GRID_H);
+  for(let i=0;i<noise.length;i++) noise[i] = (Math.random()-0.5)*14;
+
+  let cellW=10, cellH=10, dpr=1;
+  let vandals = [], tourists = [], toasts = [];
+  let vandalTimer = 3, touristTimer = 4, reagentCooldown = 0;
+  let state = 'start'; // start | playing | lost | won
+  let elapsed = 0, budget = CONFIG.START_BUDGET, caughtCount = 0, vandalsCaught = 0, touristsShooed = 0, breaches = 0;
+  let lastTs = 0;
+
+  const pointer = { x:0, y:0, down:false, ready:false };
+
+  // ---------- helpers ----------
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function clamp(v,lo,hi){ return v<lo?lo:(v>hi?hi:v); }
+  function randRange(a,b){ return a+Math.random()*(b-a); }
+  function idx(x,y){ return y*GRID_W+x; }
+  function fmtMoney(n){ return '$'+Math.round(n).toLocaleString('ru-RU'); }
+  function fmtTime(s){
+    const m = Math.floor(s/60), sec = Math.floor(s%60);
+    return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  }
+  function roundRect(c,x,y,w,h,r){
+    c.beginPath();
+    c.moveTo(x+r,y);
+    c.arcTo(x+w,y,x+w,y+h,r);
+    c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r);
+    c.arcTo(x,y,x+w,y,r);
+    c.closePath();
+  }
+
+  // ---------- sizing ----------
+  function resize(){
+    const rect = stageWrap.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    canvas.width = Math.max(1, Math.round(rect.width*dpr));
+    canvas.height = Math.max(1, Math.round(rect.height*dpr));
+    canvas.style.width = rect.width+'px';
+    canvas.style.height = rect.height+'px';
+    cellW = canvas.width/GRID_W;
+    cellH = canvas.height/GRID_H;
+    if(!pointer.ready){ pointer.x = canvas.width/2; pointer.y = canvas.height/2; pointer.ready = true; }
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- input ----------
+  function posFromEvent(e){
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches && e.touches[0];
+    const cx = (t ? t.clientX : e.clientX) - rect.left;
+    const cy = (t ? t.clientY : e.clientY) - rect.top;
+    return { x: cx*dpr, y: cy*dpr };
+  }
+  function onDown(e){
+    e.preventDefault();
+    const p = posFromEvent(e);
+    pointer.x = p.x; pointer.y = p.y; pointer.down = true;
+    if(state==='playing') tryCatch(p.x,p.y);
+  }
+  function onMove(e){
+    const p = posFromEvent(e);
+    pointer.x = p.x; pointer.y = p.y;
+  }
+  function onUp(e){ pointer.down = false; }
+  canvas.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  canvas.addEventListener('touchstart', onDown, {passive:false});
+  canvas.addEventListener('touchmove', e=>{ e.preventDefault(); onMove(e); }, {passive:false});
+  canvas.addEventListener('touchend', e=>{ e.preventDefault(); onUp(e); }, {passive:false});
+  canvas.addEventListener('touchcancel', e=>{ onUp(e); });
+
+  function tryCatch(px,py){
+    const catchPx = CONFIG.CATCH_RADIUS_CELLS*Math.min(cellW,cellH);
+    let best=null, bestD=catchPx*catchPx, bestList=null, bestI=-1;
+    [vandals,tourists].forEach(list=>{
+      for(let i=0;i<list.length;i++){
+        const e=list[i];
+        const dx=px-e.x, dy=py-e.y, d2=dx*dx+dy*dy;
+        if(d2<=bestD){ bestD=d2; best=e; bestList=list; bestI=i; }
+      }
+    });
+    if(best){
+      bestList.splice(bestI,1);
+      if(bestList===vandals){
+        vandalsCaught++; caughtCount++;
+        spawnToast(best.x,best.y,'🛡️ Диверсант перехвачен!', false);
+      } else {
+        touristsShooed++; caughtCount++;
+        spawnToast(best.x,best.y,'🙄 Турист сбежал без сувенира', false);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // ---------- entities ----------
+  function edgePoint(){
+    const side = Math.floor(Math.random()*4);
+    if(side===0) return {x:-2, y:randRange(0,GRID_H)};
+    if(side===1) return {x:GRID_W+2, y:randRange(0,GRID_H)};
+    if(side===2) return {x:randRange(0,GRID_W), y:-2};
+    return {x:randRange(0,GRID_W), y:GRID_H+2};
+  }
+  function borderTarget(){
+    const side = Math.floor(Math.random()*4);
+    if(side===0) return {x:1, y:randRange(2,GRID_H-2)};
+    if(side===1) return {x:GRID_W-2, y:randRange(2,GRID_H-2)};
+    if(side===2) return {x:randRange(2,GRID_W-2), y:1};
+    return {x:randRange(2,GRID_W-2), y:GRID_H-2};
+  }
+  function spawnVandal(){
+    const s = edgePoint();
+    const t = { x: randRange(4,GRID_W-4), y: randRange(4,GRID_H-4) };
+    vandals.push({
+      sx:s.x*cellW, sy:s.y*cellH, tx:t.x, ty:t.y,
+      x:s.x*cellW, y:s.y*cellH, t:0,
+      duration: randRange(CONFIG.VANDAL_TRAVEL_MIN, CONFIG.VANDAL_TRAVEL_MAX),
+      seed: Math.random()*10
+    });
+  }
+  function spawnTourist(){
+    const s = edgePoint();
+    const t = borderTarget();
+    tourists.push({
+      sx:s.x*cellW, sy:s.y*cellH, tx:t.x, ty:t.y,
+      x:s.x*cellW, y:s.y*cellH, t:0,
+      duration: randRange(CONFIG.TOURIST_TRAVEL_MIN, CONFIG.TOURIST_TRAVEL_MAX),
+      seed: Math.random()*10
+    });
+  }
+  function dumpAlgae(cx,cy,radius,amount){
+    const minx=Math.max(0,Math.floor(cx-radius)), maxx=Math.min(GRID_W-1,Math.ceil(cx+radius));
+    const miny=Math.max(0,Math.floor(cy-radius)), maxy=Math.min(GRID_H-1,Math.ceil(cy+radius));
+    for(let y=miny;y<=maxy;y++) for(let x=minx;x<=maxx;x++){
+      const dx=x+0.5-cx, dy=y+0.5-cy;
+      if(dx*dx+dy*dy<=radius*radius){
+        const i=idx(x,y);
+        algae[i]=Math.min(1, algae[i]+amount);
+      }
+    }
+  }
+
+  // ---------- toasts ----------
+  function spawnToast(x,y,text,negative){
+    toasts.push({x,y,text,negative,life:1.6,maxLife:1.6});
+  }
+
+  // ---------- game flow ----------
+  function resetGame(){
+    algae.fill(0);
+    for(let i=0;i<algae.length;i++) algae[i]=Math.random()*0.04;
+    damaged.fill(0);
+    vandals=[]; tourists=[]; toasts=[];
+    vandalTimer = randRange(3,5);
+    touristTimer = randRange(4,6);
+    reagentCooldown = 0;
+    elapsed = 0; budget = CONFIG.START_BUDGET;
+    caughtCount = 0; vandalsCaught = 0; touristsShooed = 0; breaches = 0;
+    state = 'playing';
+    startOverlay.classList.add('hidden');
+    endOverlay.classList.add('hidden');
+    updateReagentBtn();
+  }
+
+  function endGame(won){
+    state = won ? 'won' : 'lost';
+    endTitle.textContent = won ? 'Дожили до юбилея \u{1F389}' : 'Бассейн победил \u{1F33F}';
+    endFlavor.textContent = won
+      ? 'К торжествам бассейн всё ещё голубой. Неслыханная победа над водорослями.'
+      : 'Зелень взяла своё. Ремонт назначат заново — бюджет как-нибудь найдётся.';
+    endStats.innerHTML =
+      `Продержался: <b>${fmtTime(elapsed)}</b><br>`+
+      `Потрачено: <b>${fmtMoney(budget)}</b><br>`+
+      `Диверсантов перехвачено: <b>${vandalsCaught}</b><br>`+
+      `Туристов прогнано: <b>${touristsShooed}</b><br>`+
+      `Прорывов водорослей: <b>${breaches}</b>`;
+    endOverlay.classList.remove('hidden');
+  }
+
+  startBtn.addEventListener('click', resetGame);
+  restartBtn.addEventListener('click', resetGame);
+
+  function useReagent(){
+    if(state!=='playing' || reagentCooldown>0) return;
+    for(let i=0;i<algae.length;i++) algae[i]=Math.max(0, algae[i]-CONFIG.REAGENT_RELIEF);
+    for(let k=0;k<16;k++){ const i=Math.floor(Math.random()*algae.length); damaged[i]=1; }
+    budget += CONFIG.REAGENT_COST;
+    reagentCooldown = CONFIG.REAGENT_COOLDOWN;
+    spawnToast(canvas.width/2, canvas.height*0.3, '🧪 Реагент! -$'+ (CONFIG.REAGENT_COST/1000)+'k, краска трещит', true);
+    updateReagentBtn();
+  }
+  function updateReagentBtn(){
+    if(reagentCooldown>0){
+      reagentBtn.disabled = true;
+      reagentBtn.textContent = `🧪 Реагент (${Math.ceil(reagentCooldown)}с)`;
+    } else {
+      reagentBtn.disabled = (state!=='playing');
+      reagentBtn.textContent = '🧪 Реагент';
+    }
+  }
+  reagentBtn.addEventListener('click', useReagent);
+  window.addEventListener('keydown', e=>{
+    if(e.code==='Space' && (!document.activeElement || document.activeElement.tagName!=='BUTTON')){
+      e.preventDefault(); useReagent();
+    }
+  });
+
+  // ---------- simulation update ----------
+  function neighborAvgAt(x,y){
+    let s=0,c=0;
+    for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
+      if(ox===0&&oy===0) continue;
+      const nx=x+ox, ny=y+oy;
+      if(nx>=0&&nx<GRID_W&&ny>=0&&ny<GRID_H){ s+=algae[idx(nx,ny)]; c++; }
+    }
+    return c? s/c : 0;
+  }
+
+  function update(dt){
+    if(state!=='playing'){ return; }
+    elapsed += dt;
+    const difficulty = 1 + elapsed/CONFIG.DIFFICULTY_RAMP;
+
+    // algae growth / diffusion (single-pass, minor directional bias is fine for a game)
+    for(let y=0;y<GRID_H;y++) for(let x=0;x<GRID_W;x++){
+      const i=idx(x,y);
+      const nb = neighborAvgAt(x,y);
+      const growth = CONFIG.GROWTH_BASE*difficulty*dt*(0.3+nb);
+      algae[i] = Math.min(1, algae[i]+growth);
+    }
+
+    // player scrubbing
+    if(pointer.down){
+      const r = CONFIG.CLEAN_RADIUS_CELLS;
+      const pcx = pointer.x/cellW, pcy = pointer.y/cellH;
+      const minx=Math.max(0,Math.floor(pcx-r)), maxx=Math.min(GRID_W-1,Math.ceil(pcx+r));
+      const miny=Math.max(0,Math.floor(pcy-r)), maxy=Math.min(GRID_H-1,Math.ceil(pcy+r));
+      for(let y=miny;y<=maxy;y++) for(let x=minx;x<=maxx;x++){
+        const dx=x+0.5-pcx, dy=y+0.5-pcy;
+        if(dx*dx+dy*dy<=r*r){
+          const i=idx(x,y);
+          algae[i]=Math.max(0, algae[i]-CONFIG.CLEAN_RATE*dt);
+        }
+      }
+    }
+
+    // damaged flecks slowly fade (cosmetic only)
+    for(let i=0;i<damaged.length;i++) if(damaged[i]>0) damaged[i]=Math.max(0,damaged[i]-dt*0.12);
+
+    // spawn timers
+    vandalTimer -= dt;
+    if(vandalTimer<=0){ spawnVandal(); vandalTimer = randRange(CONFIG.VANDAL_SPAWN_MIN,CONFIG.VANDAL_SPAWN_MAX)/difficulty; }
+    touristTimer -= dt;
+    if(touristTimer<=0){ spawnTourist(); touristTimer = randRange(CONFIG.TOURIST_SPAWN_MIN,CONFIG.TOURIST_SPAWN_MAX)/difficulty; }
+
+    // vandals
+    for(let i=vandals.length-1;i>=0;i--){
+      const v=vandals[i];
+      v.t += dt/v.duration;
+      if(v.t>=1){
+        dumpAlgae(v.tx, v.ty, CONFIG.VANDAL_DUMP_RADIUS, CONFIG.VANDAL_DUMP_AMOUNT);
+        spawnToast(v.tx*cellW, v.ty*cellH, '💥 Диверсия! Водоросли в воде', true);
+        breaches++;
+        if(!prefersReducedMotion){ stageWrap.classList.add('shake'); setTimeout(()=>stageWrap.classList.remove('shake'),400); }
+        vandals.splice(i,1);
+      } else {
+        v.x = lerp(v.sx, v.tx*cellW, v.t);
+        v.y = lerp(v.sy, v.ty*cellH, v.t);
+      }
+    }
+    // tourists
+    for(let i=tourists.length-1;i>=0;i--){
+      const t=tourists[i];
+      t.t += dt/t.duration;
+      if(t.t>=1){
+        dumpAlgae(t.tx, t.ty, CONFIG.TOURIST_BUMP_RADIUS, CONFIG.TOURIST_ALGAE_BUMP);
+        budget += CONFIG.TOURIST_CHIP_COST;
+        spawnToast(t.tx*cellW, t.ty*cellH, '📸 Скол на память! -$'+(CONFIG.TOURIST_CHIP_COST/1000)+'k', true);
+        tourists.splice(i,1);
+      } else {
+        t.x = lerp(t.sx, t.tx*cellW, t.t);
+        t.y = lerp(t.sy, t.ty*cellH, t.t);
+      }
+    }
+
+    if(reagentCooldown>0){ reagentCooldown=Math.max(0,reagentCooldown-dt); updateReagentBtn(); }
+
+    // toasts lifetime
+    for(let i=toasts.length-1;i>=0;i--){
+      toasts[i].life -= dt;
+      if(toasts[i].life<=0) toasts.splice(i,1);
+    }
+
+    // end conditions
+    let sum=0; for(let i=0;i<algae.length;i++) sum+=algae[i];
+    const avg = sum/algae.length;
+    if(avg>=CONFIG.LOSE_THRESHOLD){ endGame(false); }
+    else if(elapsed>=CONFIG.WIN_TIME){ endGame(true); }
+  }
+
+  // ---------- rendering ----------
+  function renderWater(){
+    const data = offImg.data;
+    for(let y=0;y<GRID_H;y++) for(let x=0;x<GRID_W;x++){
+      const i = idx(x,y);
+      const v = algae[i], d = damaged[i];
+      let r = lerp(29,76,v), g = lerp(111,122,v), b = lerp(165,46,v);
+      r = lerp(r,150,d*0.55); g = lerp(g,148,d*0.55); b = lerp(b,140,d*0.55);
+      const n = noise[i];
+      r=clamp(r+n,0,255); g=clamp(g+n,0,255); b=clamp(b+n,0,255);
+      const p = i*4;
+      data[p]=r; data[p+1]=g; data[p+2]=b; data[p+3]=255;
+    }
+    offCtx.putImageData(offImg,0,0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(offCanvas, 0,0,GRID_W,GRID_H, 0,0,canvas.width,canvas.height);
+  }
+
+  function drawShimmer(t){
+    if(prefersReducedMotion) return;
+    ctx.save();
+    ctx.globalAlpha = 0.05;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(2,cellH*0.4);
+    const off = (t*40)%(cellW*6);
+    for(let k=-2;k<10;k++){
+      ctx.beginPath();
+      ctx.moveTo(k*cellW*6-off, 0);
+      ctx.lineTo(k*cellW*6-off+canvas.height, canvas.height);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawEntity(e, emoji, t){
+    const size = Math.min(cellW,cellH)*2.5;
+    ctx.save();
+    ctx.translate(e.x, e.y + Math.sin(t*7+e.seed)*size*0.08);
+    ctx.font = `${size}px "Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=size*0.15;
+    ctx.fillText(emoji, 0, 0);
+    ctx.restore();
+  }
+
+  function drawPlayer(x,y,active,t){
+    const s = Math.min(cellW,cellH)*2.6;
+    ctx.save();
+    ctx.translate(x, y + Math.sin(t*6)*s*0.03);
+    const wiggle = active ? Math.sin(t*24)*0.12 : Math.sin(t*2)*0.02;
+
+    // clean-radius indicator
+    ctx.beginPath();
+    ctx.arc(0, s*0.5, CONFIG.CLEAN_RADIUS_CELLS*Math.min(cellW,cellH), 0, Math.PI*2);
+    ctx.fillStyle = active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.07)';
+    ctx.fill();
+
+    ctx.rotate(wiggle);
+
+    // mop handle + head
+    ctx.strokeStyle = '#6b4a2f'; ctx.lineWidth = s*0.06; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(s*0.2, s*0.05); ctx.lineTo(s*0.55, s*0.7); ctx.stroke();
+    ctx.fillStyle = active ? '#eef4f6' : '#c8d2d6';
+    roundRect(ctx, s*0.4, s*0.6, s*0.32, s*0.16, s*0.05); ctx.fill();
+
+    // suit body
+    ctx.fillStyle = '#1b2f52';
+    roundRect(ctx, -s*0.32, -s*0.02, s*0.62, s*0.55, s*0.14); ctx.fill();
+
+    // tie
+    ctx.fillStyle = '#B33A3A';
+    ctx.beginPath();
+    ctx.moveTo(-s*0.055,0.0); ctx.lineTo(s*0.055,0.0); ctx.lineTo(0,s*0.3);
+    ctx.closePath(); ctx.fill();
+
+    // head
+    ctx.fillStyle = '#e8ab6f';
+    ctx.beginPath(); ctx.ellipse(0,-s*0.28, s*0.23, s*0.25, 0,0,Math.PI*2); ctx.fill();
+
+    // hair swoosh
+    ctx.fillStyle = '#e8c95a';
+    ctx.beginPath();
+    ctx.moveTo(-s*0.25,-s*0.36);
+    ctx.quadraticCurveTo(-s*0.04,-s*0.6, s*0.27,-s*0.42);
+    ctx.quadraticCurveTo(s*0.08,-s*0.45,-s*0.02,-s*0.34);
+    ctx.quadraticCurveTo(-s*0.15,-s*0.3,-s*0.25,-s*0.36);
+    ctx.closePath(); ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawToasts(){
+    ctx.save();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const tst of toasts){
+      const p = 1 - tst.life/tst.maxLife;
+      ctx.globalAlpha = clamp(tst.life/0.35, 0, 1);
+      ctx.font = `${Math.round(Math.min(cellW,cellH)*1.15)}px 'Oswald',sans-serif`;
+      const yy = tst.y - p*(cellH*3);
+      ctx.lineWidth = 4; ctx.strokeStyle='rgba(0,0,0,.65)';
+      ctx.strokeText(tst.text, tst.x, yy);
+      ctx.fillStyle = tst.negative ? '#ff9a9a' : '#dff0d8';
+      ctx.fillText(tst.text, tst.x, yy);
+    }
+    ctx.restore();
+  }
+
+  function render(t){
+    renderWater();
+    drawShimmer(t);
+    for(const v of vandals) drawEntity(v, '\u{1F9B9}', t);
+    for(const tr of tourists) drawEntity(tr, '\u{1F4F8}', t);
+    if(state==='playing') drawPlayer(pointer.x, pointer.y, pointer.down, t);
+    drawToasts();
+  }
+
+  // ---------- HUD ----------
+  function updateHud(){
+    let sum=0; for(let i=0;i<algae.length;i++) sum+=algae[i];
+    const avg = algae.length? sum/algae.length : 0;
+    hudBudget.textContent = fmtMoney(budget);
+    hudTime.textContent = fmtTime(elapsed);
+    hudAlgae.textContent = Math.round(avg*100)+'%';
+    hudCaught.textContent = String(caughtCount);
+  }
+
+  // ---------- main loop ----------
+  function frame(ts){
+    if(!lastTs) lastTs = ts;
+    let dt = (ts-lastTs)/1000;
+    lastTs = ts;
+    dt = Math.min(dt, 0.05); // clamp for tab-switch / stalls
+
+    update(dt);
+    updateHud();
+    render(ts/1000);
+
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  updateReagentBtn();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
 

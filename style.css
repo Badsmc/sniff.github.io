@@ -1,0 +1,76 @@
+/* Используем переменные Telegram для нативного вида, с резервными цветами для обычного веба */
+:root {
+    --bg-color: var(--tg-theme-bg-color, #f4f4f9);
+    --text-color: var(--tg-theme-text-color, #333333);
+    --btn-color: var(--tg-theme-button-color, #0088cc);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+}
+
+body {
+    font-family: sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding: 16px;
+    /* Убирает синюю подсветку при тапе на мобильных устройствах */
+    -webkit-tap-highlight-color: transparent; 
+    touch-action: manipulation;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+select {
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 16px; /* 16px предотвращает автоматический зум в iOS Safari */
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--btn-color);
+}
+
+.grid-container {
+    display: grid;
+    /* Автоматическая сетка: карточки не меньше 140px, растягиваются на всю ширину */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.game-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 150px;
+}
+
+.game-card p {
+    font-size: 14px;
+    margin: 8px 0 16px 0;
+    opacity: 0.8;
+}
+
+.play-btn {
+    display: block;
+    background-color: var(--btn-color);
+    color: var(--btn-text);
+    text-decoration: none;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer; 
+}

@@ -17,8 +17,8 @@ body {
     font-family: sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
-    padding: 16px;
-    /* Убирает синюю подсветку при тапе на мобильных устройствах */
+    /* Отступы: сверху 60px, справа 16px, снизу 16px, слева 16px */
+    padding: 60px 16px 16px 16px;
     -webkit-tap-highlight-color: transparent; 
     touch-action: manipulation;
 }

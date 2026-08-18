@@ -2,25 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- Блокируем зум при двойном тапе для мобильных -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title data-i18n="page_title">Games</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Официальный скрипт для интеграции с Telegram Mini App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-    <header>
-        <h1 data-i18n="page_title">Games</h1>
-        <select id="lang-select">
-            <option value="en">English</option>
-            <option value="ru">Русский</option>
-        </select>
-    </header>
-    <main>
-        <!-- Сюда скрипт автоматически добавит карточки игр -->
-        <div id="games-container" class="grid-container"></div>
-    </main>
+    <!-- Каталог (витрина) -->
+    <div id="catalog">
+        <header>
+            <h1 data-i18n="page_title">Games</h1>
+            <select id="lang-select">
+                <option value="en">English</option>
+                <option value="ru">Русский</option>
+            </select>
+        </header>
+        <main>
+            <div id="games-container" class="grid-container"></div>
+        </main>
+    </div>
+
+    <!-- Контейнер для запуска игр (изначально скрыт) -->
+    <div id="game-wrapper" class="hidden">
+        <!-- Кнопка назад для обычного веба (в Telegram она скроется) -->
+        <button id="web-back-btn">Назад / Back</button>
+        <!-- Окно, в котором будет открываться игра -->
+        <iframe id="game-frame" src="" frameborder="0"></iframe>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

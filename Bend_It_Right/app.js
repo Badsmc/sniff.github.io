@@ -29,7 +29,7 @@ let baseShapeType = 'rect';
 let basePoints = []; 
 let flangesByEdge = {}; 
 let selectedEdge = 0;
-const SHEET_THICKNESS = 1.5; // Толщина метала (мм)
+const SHEET_THICKNESS = 1.5; // Толщина металла (мм)
 
 // DOM Элементы
 const canvas = document.getElementById('flatCanvas');
@@ -113,16 +113,9 @@ function getEdgeChain2DPolygons(edgeIdx) {
   let currP1 = [p1[0], p1[1]];
   let currP2 = [p2[0], p2[1]];
 
-  chain.forEach((seg, idx) => {
-    // В первом сегменте подрезаем углы на 45° для сопряжения стен в 3D
-    const cut = idx === 0 ? seg.length : 0;
-    
-    // Вектор вдоль кромки
-    const ex = dx / len;
-    const ey = dy / len;
-
-    const nextP1 = [currP1[0] + nx * seg.length + ex * cut, currP1[1] + ny * seg.length + ey * cut];
-    const nextP2 = [currP2[0] + nx * seg.length - ex * cut, currP2[1] + ny * seg.length - ey * cut];
+  chain.forEach((seg) => {
+    const nextP1 = [currP1[0] + nx * seg.length, currP1[1] + ny * seg.length];
+    const nextP2 = [currP2[0] + nx * seg.length, currP2[1] + ny * seg.length];
 
     polygons.push({
       poly: [currP1, currP2, nextP2, nextP1],
@@ -355,7 +348,7 @@ function updateOpList() {
   });
 }
 
-// --- THREE.JS (3D РЕНДЕР С ПОДРЕЗКОЙ УГЛОВ) ---
+// --- THREE.JS (3D РЕНДЕР) ---
 let scene, camera, renderer, controls, sheetGroup;
 let is3DInit = false;
 
@@ -393,7 +386,7 @@ function init3D() {
 }
 
 function build3DModel() {
-  // Безопасная очистка старых объектов
+  // Очистка группы объектов
   while (sheetGroup.children.length > 0) { 
     sheetGroup.remove(sheetGroup.children[0]); 
   }
@@ -407,7 +400,7 @@ function build3DModel() {
 
   const extrudeSettings = { depth: SHEET_THICKNESS, bevelEnabled: false };
 
-  // 1. Отрисовка ДНА (Базового полигона)
+  // 1. Дно (Базовое основание)
   const baseShape = new THREE.Shape();
   baseShape.moveTo(basePoints[0][0], basePoints[0][1]);
   for (let i = 1; i < basePoints.length; i++) {
@@ -419,7 +412,7 @@ function build3DModel() {
   const baseMesh = new THREE.Mesh(baseGeo, material);
   sheetGroup.add(baseMesh);
 
-  // 2. Отрисовка ПОЛОК с угловыми срезами (45° Miter)
+  // 2. Стенки и фланцы
   for (let edgeIdx = 0; edgeIdx < basePoints.length; edgeIdx++) {
     const chain = flangesByEdge[edgeIdx];
     if (!chain || chain.length === 0) continue;
@@ -451,29 +444,18 @@ function build3DModel() {
     const localOutY = -Math.sin(edgeAngle) * outX + Math.cos(edgeAngle) * outY;
     const bendSign = localOutY < 0 ? -1 : 1;
 
-    chain.forEach((seg, segIdx) => {
+    chain.forEach((seg) => {
       const segPivot = new THREE.Group();
       segPivot.rotation.x = bendSign * (seg.angle * Math.PI / 180);
 
       const flen = seg.length;
       
-      // Геометрия фланца с подрезкой 45° на первом гибе для идеального сопряжения углов
+      // Геометрия прямоугольной полки без деформаций
       const flangeShape = new THREE.Shape();
-      
-      if (segIdx === 0 && Math.abs(seg.angle) >= 80) {
-        // Трапеция (Miter joint под 45°)
-        const miterOffset = flen; // Срез под 45°
-        flangeShape.moveTo(0, 0);
-        flangeShape.lineTo(width, 0);
-        flangeShape.lineTo(Math.max(width / 2, width - miterOffset), -flen);
-        flangeShape.lineTo(Math.min(width / 2, miterOffset), -flen);
-      } else {
-        // Прямоугольник
-        flangeShape.moveTo(0, 0);
-        flangeShape.lineTo(width, 0);
-        flangeShape.lineTo(width, -flen);
-        flangeShape.lineTo(0, -flen);
-      }
+      flangeShape.moveTo(0, 0);
+      flangeShape.lineTo(width, 0);
+      flangeShape.lineTo(width, -flen);
+      flangeShape.lineTo(0, -flen);
       flangeShape.closePath();
 
       const flangeGeo = new THREE.ExtrudeGeometry(flangeShape, extrudeSettings);

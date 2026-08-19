@@ -10,7 +10,10 @@ const usdEl = document.getElementById('usd-balance');
 const assetEl = document.getElementById('asset-balance');
 const newsEl = document.getElementById('news-ticker');
 const energyFill = document.getElementById('energy-fill');
+
 const gameOverScreen = document.getElementById('game-over');
+const newsModal = document.getElementById('news-modal');
+const newsModalText = document.getElementById('news-modal-text');
 const finalScoreEl = document.getElementById('final-score');
 const finalMoneyEl = document.getElementById('final-money');
 
@@ -19,35 +22,37 @@ canvas.height = window.innerHeight * 0.45;
 
 let state = {
     running: false,
+    paused: false,
     day: 1,
     tickCounter: 0,
-    ticksPerDay: 90,  // 3 секунды = 1 день
+    ticksPerDay: 90,  
     price: 100,
     history: [],
     
     mmBudget: 100,
     maxMmBudget: 100,
-    
     personalUsd: 1000,
     personalAsset: 0,
     
     trend: 0,
+    newsTicksLeft: 0, // Счетчик действия новости
+    
     upperBound: 180,
     lowerBound: 20,
     minGap: 70,
-    shrinkRate: 2, 
+    shrinkRate: 1, // Снижена скорость сужения коридора
     tickRate: 1000 / 30 
 };
 
-// БАЛАНС: сила новостей уменьшена для 30 FPS
+// БАЛАНС: Снижена сила новостей
 const NEWS_EVENTS = [
-    { text: "SEC одобряет ETF!", impact: 0.15 },
-    { text: "Взлом крупной биржи!", impact: -0.20 },
-    { text: "Маск упомянул монету", impact: 0.15 },
-    { text: "Запрет майнинга", impact: -0.15 },
-    { text: "Инфляция ниже ожиданий", impact: 0.08 },
-    { text: "Киты сливают активы", impact: -0.12 },
-    { text: "Новое партнерство", impact: 0.10 }
+    { text: "SEC одобряет ETF!", impact: 0.10 },
+    { text: "Взлом крупной биржи!", impact: -0.12 },
+    { text: "Маск упомянул монету", impact: 0.08 },
+    { text: "Запрет майнинга", impact: -0.10 },
+    { text: "Инфляция ниже ожиданий", impact: 0.05 },
+    { text: "Киты сливают активы", impact: -0.08 },
+    { text: "Новое партнерство", impact: 0.06 }
 ];
 
 let newsInterval;
@@ -56,6 +61,7 @@ function initGame() {
     state = {
         ...state,
         running: true,
+        paused: false,
         day: 1,
         tickCounter: 0,
         price: 100,
@@ -63,43 +69,58 @@ function initGame() {
         personalUsd: 1000,
         personalAsset: 0,
         trend: 0,
+        newsTicksLeft: 0,
         upperBound: 180,
         lowerBound: 20,
         history: new Array(Math.floor(canvas.width / 4)).fill(100)
     };
     
     gameOverScreen.classList.add('hidden');
+    newsModal.classList.add('hidden');
     newsEl.innerText = "Рынок стабилен";
     updateUI();
     
     clearInterval(newsInterval);
-    newsInterval = setInterval(generateNews, 10000); 
+    newsInterval = setInterval(triggerNews, 10000); 
     
+    lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
 
-function generateNews() {
-    if (!state.running) return;
+function triggerNews() {
+    if (!state.running || state.paused) return;
+    
     const event = NEWS_EVENTS[Math.floor(Math.random() * NEWS_EVENTS.length)];
-    newsEl.innerText = `НОВОСТЬ: ${event.text}`;
+    
+    // Пауза игры
+    state.paused = true;
+    
+    // Настройка тренда (будет действовать 60 тиков = 2 секунды)
     state.trend = event.impact;
+    state.newsTicksLeft = 60;
+    
+    // Показ окна
+    newsModalText.innerText = event.text;
+    newsModal.classList.remove('hidden');
+    newsEl.innerText = `Активно: ${event.text}`;
     
     if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(event.impact > 0 ? 'success' : 'warning');
-    
-    setTimeout(() => { 
-        if (state.running) {
-            state.trend = 0; 
-            newsEl.innerText = "Рынок стабилизируется..."; 
-        }
-    }, 5000);
 }
 
-// БАЛАНС: усилен маркетмейкер (сила 12, стоимость 20%)
+// Кнопка закрытия новостей
+document.getElementById('btn-continue').addEventListener('click', () => {
+    newsModal.classList.add('hidden');
+    state.paused = false;
+    lastTime = performance.now(); // Сброс таймера, чтобы не было резкого скачка графики
+    requestAnimationFrame(gameLoop);
+});
+
+// БАЛАНС: сила ММ = 15, стоимость = 15%
 function applyMMForce(amount) {
-    if (!state.running) return;
-    if (state.mmBudget >= 20) { 
+    if (!state.running || state.paused) return;
+    if (state.mmBudget >= 15) { 
         state.price += amount;
-        state.mmBudget -= 20;
+        state.mmBudget -= 15;
         updateUI();
         if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     } else {
@@ -108,7 +129,7 @@ function applyMMForce(amount) {
 }
 
 function buyAsset() {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     if (state.personalUsd >= state.price) {
         state.personalUsd -= state.price;
         state.personalAsset += 1;
@@ -118,7 +139,7 @@ function buyAsset() {
 }
 
 function sellAsset() {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     if (state.personalAsset >= 1) {
         state.personalUsd += state.price;
         state.personalAsset -= 1;
@@ -127,13 +148,13 @@ function sellAsset() {
     }
 }
 
-document.getElementById('btn-pump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(12); });
-document.getElementById('btn-dump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(-12); });
+document.getElementById('btn-pump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(15); });
+document.getElementById('btn-dump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(-15); });
 document.getElementById('btn-buy').addEventListener('touchstart', (e) => { e.preventDefault(); buyAsset(); });
 document.getElementById('btn-sell').addEventListener('touchstart', (e) => { e.preventDefault(); sellAsset(); });
 
-document.getElementById('btn-pump').addEventListener('mousedown', () => applyMMForce(12));
-document.getElementById('btn-dump').addEventListener('mousedown', () => applyMMForce(-12));
+document.getElementById('btn-pump').addEventListener('mousedown', () => applyMMForce(15));
+document.getElementById('btn-dump').addEventListener('mousedown', () => applyMMForce(-15));
 document.getElementById('btn-buy').addEventListener('mousedown', () => buyAsset());
 document.getElementById('btn-sell').addEventListener('mousedown', () => sellAsset());
 
@@ -149,7 +170,14 @@ function updateUI() {
 }
 
 function updateLogic() {
-    // БАЛАНС: снижен случайный шум толпы с 1.2 до 0.8
+    // Обработка длительности новости по тикам
+    if (state.newsTicksLeft > 0) {
+        state.newsTicksLeft--;
+    } else if (state.trend !== 0) {
+        state.trend = 0;
+        newsEl.innerText = "Рынок стабилен";
+    }
+
     const crowdNoise = (Math.random() - 0.5) * 0.8; 
     state.price += crowdNoise + state.trend;
     
@@ -221,7 +249,8 @@ function drawChart() {
 
 let lastTime = 0;
 function gameLoop(timestamp) {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
+    
     if (timestamp - lastTime >= state.tickRate) {
         updateLogic();
         drawChart();

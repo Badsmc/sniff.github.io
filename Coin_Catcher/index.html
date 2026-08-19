@@ -3,19 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Market Maker Simulator</title>
+    <title>Market Maker & Trader Simulator</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <div id="header">
-        <div id="score">Время: 0s</div>
+        <div class="stats-row">
+            <span id="day-counter">День: 1</span>
+            <span id="net-worth">Капитал: $1000</span>
+        </div>
         <div id="news-ticker">Ожидание новостей...</div>
     </div>
     
     <canvas id="chartCanvas"></canvas>
     
-    <div id="controls">
+    <!-- Панель трейдера (заработок) -->
+    <div id="trader-panel" class="panel">
+        <div class="panel-title">Ваш портфель</div>
+        <div class="portfolio-stats">
+            <div>USD: <span id="usd-balance">1000.0</span></div>
+            <div>Актив: <span id="asset-balance">0</span> шт</div>
+        </div>
+        <div class="buttons">
+            <button id="btn-buy" class="btn blue">КУПИТЬ 🛒</button>
+            <button id="btn-sell" class="btn orange">ПРОДАТЬ 💰</button>
+        </div>
+    </div>
+
+    <!-- Панель маркетмейкера (управление рынком) -->
+    <div id="mm-panel" class="panel">
+        <div class="panel-title">Бюджет ММ (обновляется 1 раз в день)</div>
         <div class="energy-bar"><div id="energy-fill"></div></div>
         <div class="buttons">
             <button id="btn-dump" class="btn red">DUMP 📉</button>
@@ -25,7 +43,8 @@
 
     <div id="game-over" class="hidden">
         <h2>Рынок рухнул!</h2>
-        <div id="final-score">Время: 0s</div>
+        <div id="final-score">Прожито дней: 0</div>
+        <div id="final-money">Итоговый капитал: $0</div>
         <button id="btn-restart">Играть снова</button>
     </div>
 

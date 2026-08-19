@@ -15,21 +15,19 @@ const finalScoreEl = document.getElementById('final-score');
 const finalMoneyEl = document.getElementById('final-money');
 
 canvas.width = window.innerWidth;
-canvas.height = window.innerHeight * 0.45; // Уменьшили холст, чтобы влезли обе панели
+canvas.height = window.innerHeight * 0.45; 
 
 let state = {
     running: false,
     day: 1,
     tickCounter: 0,
-    ticksPerDay: 90,  // 3 секунды реального времени = 1 игровой день
+    ticksPerDay: 90,  // 3 секунды = 1 день
     price: 100,
     history: [],
     
-    // Экономика маркетмейкера
     mmBudget: 100,
     maxMmBudget: 100,
     
-    // Экономика трейдера
     personalUsd: 1000,
     personalAsset: 0,
     
@@ -37,18 +35,19 @@ let state = {
     upperBound: 180,
     lowerBound: 20,
     minGap: 70,
-    shrinkRate: 2, // На сколько сужается коридор каждый игровой день
-    tickRate: 1000 / 30 // 30 FPS
+    shrinkRate: 2, 
+    tickRate: 1000 / 30 
 };
 
+// БАЛАНС: сила новостей уменьшена для 30 FPS
 const NEWS_EVENTS = [
-    { text: "SEC одобряет ETF!", impact: 1.5 },
-    { text: "Взлом крупной биржи!", impact: -2.0 },
-    { text: "Маск упомянул монету", impact: 1.5 },
-    { text: "Запрет майнинга", impact: -1.5 },
-    { text: "Инфляция ниже ожиданий", impact: 0.5 },
-    { text: "Киты сливают активы", impact: -1.0 },
-    { text: "Новое партнерство", impact: 1.0 }
+    { text: "SEC одобряет ETF!", impact: 0.15 },
+    { text: "Взлом крупной биржи!", impact: -0.20 },
+    { text: "Маск упомянул монету", impact: 0.15 },
+    { text: "Запрет майнинга", impact: -0.15 },
+    { text: "Инфляция ниже ожиданий", impact: 0.08 },
+    { text: "Киты сливают активы", impact: -0.12 },
+    { text: "Новое партнерство", impact: 0.10 }
 ];
 
 let newsInterval;
@@ -74,7 +73,7 @@ function initGame() {
     updateUI();
     
     clearInterval(newsInterval);
-    newsInterval = setInterval(generateNews, 10000); // Новости реже, раз в 10 секунд
+    newsInterval = setInterval(generateNews, 10000); 
     
     requestAnimationFrame(gameLoop);
 }
@@ -95,12 +94,12 @@ function generateNews() {
     }, 5000);
 }
 
-// Управление మార్кетмейкером
+// БАЛАНС: усилен маркетмейкер (сила 12, стоимость 20%)
 function applyMMForce(amount) {
     if (!state.running) return;
-    if (state.mmBudget >= 25) { // Тратим 25% бюджета за клик
+    if (state.mmBudget >= 20) { 
         state.price += amount;
-        state.mmBudget -= 25;
+        state.mmBudget -= 20;
         updateUI();
         if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
     } else {
@@ -108,10 +107,8 @@ function applyMMForce(amount) {
     }
 }
 
-// Управление Трейдером
 function buyAsset() {
     if (!state.running) return;
-    // Покупаем 1 актив
     if (state.personalUsd >= state.price) {
         state.personalUsd -= state.price;
         state.personalAsset += 1;
@@ -122,7 +119,6 @@ function buyAsset() {
 
 function sellAsset() {
     if (!state.running) return;
-    // Продаем 1 актив
     if (state.personalAsset >= 1) {
         state.personalUsd += state.price;
         state.personalAsset -= 1;
@@ -131,14 +127,13 @@ function sellAsset() {
     }
 }
 
-document.getElementById('btn-pump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(6); });
-document.getElementById('btn-dump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(-6); });
+document.getElementById('btn-pump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(12); });
+document.getElementById('btn-dump').addEventListener('touchstart', (e) => { e.preventDefault(); applyMMForce(-12); });
 document.getElementById('btn-buy').addEventListener('touchstart', (e) => { e.preventDefault(); buyAsset(); });
 document.getElementById('btn-sell').addEventListener('touchstart', (e) => { e.preventDefault(); sellAsset(); });
 
-// Fallback для ПК
-document.getElementById('btn-pump').addEventListener('mousedown', () => applyMMForce(6));
-document.getElementById('btn-dump').addEventListener('mousedown', () => applyMMForce(-6));
+document.getElementById('btn-pump').addEventListener('mousedown', () => applyMMForce(12));
+document.getElementById('btn-dump').addEventListener('mousedown', () => applyMMForce(-12));
 document.getElementById('btn-buy').addEventListener('mousedown', () => buyAsset());
 document.getElementById('btn-sell').addEventListener('mousedown', () => sellAsset());
 
@@ -154,18 +149,16 @@ function updateUI() {
 }
 
 function updateLogic() {
-    // Шум толпы снижен для более медленного движения
-    const crowdNoise = (Math.random() - 0.5) * 1.2; 
+    // БАЛАНС: снижен случайный шум толпы с 1.2 до 0.8
+    const crowdNoise = (Math.random() - 0.5) * 0.8; 
     state.price += crowdNoise + state.trend;
     
-    // Отсчет дней
     state.tickCounter++;
     if (state.tickCounter >= state.ticksPerDay) {
         state.day++;
         state.tickCounter = 0;
-        state.mmBudget = state.maxMmBudget; // Восполнение бюджета раз в день
+        state.mmBudget = state.maxMmBudget; 
         
-        // Сужение коридора происходит раз в день
         const currentGap = state.upperBound - state.lowerBound;
         if (currentGap > state.minGap) {
             state.upperBound -= state.shrinkRate;

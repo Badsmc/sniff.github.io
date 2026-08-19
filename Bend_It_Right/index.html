@@ -3,619 +3,447 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Bend Master: CNC Bending</title>
-  <!-- Telegram Mini App SDK -->
+  <title>SheetMetal 3D Simulator</title>
+  
+  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Three.js для 3D -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- OrbitControls для вращения 3D модели -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
+    :root {
+      --bg: #141418;
+      --panel: #1e1e24;
+      --card: #282833;
+      --accent: #4da6ff;
+      --border: #383845;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: var(--tg-theme-bg-color, #18181c);
-      color: var(--tg-theme-text-color, #e0e0e0);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    header { background: var(--panel); padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    h1 { font-size: 1.1rem; color: var(--accent); }
+    
+    .app-container { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
+    @media(min-width: 768px) { .app-container { flex-direction: row; } }
 
-    header {
-      background: var(--tg-theme-secondary-bg-color, #23232b);
-      padding: 10px 16px;
-      border-bottom: 1px solid #383845;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
+    /* 2D Canvas Area */
+    .editor-zone { flex: 1; display: flex; flex-direction: column; position: relative; background: #0d0d10; }
+    #flatCanvas { flex: 1; width: 100%; touch-action: none; cursor: crosshair; }
+    .hint-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; pointer-events: none; border: 1px solid var(--border); }
 
-    h1 { font-size: 1rem; color: #4da6ff; }
+    /* Controls Area */
+    .controls-zone { width: 100%; background: var(--panel); padding: 12px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); overflow-y: auto; max-height: 45vh; }
+    @media(min-width: 768px) { .controls-zone { width: 340px; border-top: none; border-left: 1px solid var(--border); max-height: 100%; } }
 
-    .level-badge {
-      background: #383845;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-weight: bold;
-      font-size: 0.75rem;
-      color: #00e676;
-    }
-
-    .main-container {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      overflow: hidden;
-    }
-
-    @media (min-width: 768px) {
-      .main-container {
-        flex-direction: row;
-      }
-    }
-
-    .view-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background: #101014;
-      position: relative;
-      min-height: 220px;
-    }
-
-    .blueprint-card {
-      background: #1a233a;
-      border: 1px solid #2a3b63;
-      padding: 10px 12px;
-      margin: 8px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      flex-shrink: 0;
-    }
-
-    .blueprint-card h2 {
-      font-size: 0.85rem;
-      color: #82b1ff;
-      margin-bottom: 4px;
-    }
-
-    .canvas-wrapper {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 8px;
-      overflow: hidden;
-    }
-
-    canvas {
-      background: #141418;
-      border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      max-width: 100%;
-      max-height: 100%;
-      touch-action: none;
-    }
-
-    .controls-panel {
-      width: 100%;
-      background: var(--tg-theme-secondary-bg-color, #202028);
-      border-top: 1px solid #383845;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      overflow-y: auto;
-      max-height: 50vh;
-    }
-
-    @media (min-width: 768px) {
-      .controls-panel {
-        width: 360px;
-        max-height: 100%;
-        border-top: none;
-        border-left: 1px solid #383845;
-      }
-    }
-
-    .panel-section {
-      background: #282833;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #383845;
-    }
-
-    .panel-section h3 {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #9e9ea6;
-      margin-bottom: 8px;
-    }
-
-    label { display: block; font-size: 0.75rem; margin-bottom: 4px; color: #ccc; }
-
-    select, input, button {
-      width: 100%;
-      height: 42px;
-      padding: 0 10px;
-      margin-bottom: 8px;
-      border-radius: 6px;
-      border: 1px solid #48485a;
-      background: #18181c;
-      color: #fff;
-      font-size: 0.9rem;
-      touch-action: manipulation;
-    }
-
-    button {
-      background: var(--tg-theme-button-color, #0066cc);
-      color: var(--tg-theme-button-text-color, #ffffff);
-      border: none;
-      font-weight: bold;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
+    .card { background: var(--card); padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
+    .card h3 { font-size: 0.8rem; text-transform: uppercase; color: #889; margin-bottom: 10px; }
+    
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    label { display: block; font-size: 0.75rem; color: #bbb; margin-bottom: 4px; }
+    select, input { width: 100%; height: 38px; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 4px; padding: 0 8px; font-size: 0.9rem; margin-bottom: 8px; }
+    
+    button { width: 100%; height: 42px; background: var(--accent); color: #000; border: none; border-radius: 4px; font-weight: bold; font-size: 0.95rem; cursor: pointer; margin-top: 4px; }
     button:active { opacity: 0.8; }
-    button.success { background: #2e7d32; }
-    button.secondary { background: #48485a; }
+    button.success { background: #00e676; }
+    button.danger { background: #ff4d4d; color: #fff; }
 
-    .history-list {
-      list-style: none;
-      max-height: 80px;
-      overflow-y: auto;
-      font-size: 0.75rem;
-      font-family: monospace;
-    }
-
-    .history-list li {
-      padding: 3px 6px;
-      border-bottom: 1px solid #383845;
-    }
-
-    .phase-indicator {
-      display: flex;
-      gap: 6px;
-    }
-
-    .phase-tab {
-      flex: 1;
-      padding: 8px;
-      text-align: center;
-      font-size: 0.75rem;
-      background: #18181c;
-      border: 1px solid #383845;
-      border-radius: 6px;
-      color: #777;
-    }
-
-    .phase-tab.active {
-      background: var(--tg-theme-button-color, #0066cc);
-      color: var(--tg-theme-button-text-color, #ffffff);
-      border-color: transparent;
-      font-weight: bold;
-    }
+    /* 3D Modal Window */
+    #modal3d { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; display: none; flex-direction: column; }
+    #modal3d header { background: #111; border-bottom: 1px solid #333; }
+    #modal3d header button { width: auto; height: 32px; padding: 0 16px; margin: 0; }
+    #container3d { flex: 1; width: 100%; position: relative; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>Bend Master</h1>
-    <div id="levelBadge" class="level-badge">Уровень 1</div>
+    <h1>SheetMetal 3D</h1>
+    <button id="btnOpen3D" class="success" style="width: auto; height: 28px; padding: 0 12px; margin: 0;">Показать 3D Модель</button>
   </header>
 
-  <div class="main-container">
-    <div class="view-container">
-      <div class="blueprint-card">
-        <h2 id="taskTitle">Чертеж детали</h2>
-        <p id="taskDesc">Загрузка...</p>
-      </div>
-
-      <div class="canvas-wrapper" id="canvasWrapper">
-        <canvas id="simCanvas"></canvas>
-      </div>
+  <div class="app-container">
+    <!-- Зона 2D Развёртки -->
+    <div class="editor-zone" id="canvasWrapper">
+      <div class="hint-overlay">Кликните на кромку детали, чтобы выбрать линию гиба</div>
+      <canvas id="flatCanvas"></canvas>
     </div>
 
-    <div class="controls-panel">
-      
-      <div class="phase-indicator">
-        <div id="tabFlat" class="phase-tab active">1. CAD Развёртка</div>
-        <div id="tabBend" class="phase-tab">2. ЧПУ Гибка</div>
+    <!-- Панель управления -->
+    <div class="controls-zone">
+      <div class="card">
+        <h3>1. Форма основания</h3>
+        <select id="baseShapeSel">
+          <option value="rect">Квадрат (Коробка)</option>
+          <option value="hex">Шестигранник</option>
+          <option value="triangle">Треугольник</option>
+        </select>
+        <button id="btnReset" class="danger">Сбросить деталь</button>
       </div>
 
-      <div id="sectionFlat" class="panel-section">
-        <h3>Размеры развёртки</h3>
-        <label>Левая полка L1 (мм):</label>
-        <input type="number" id="flatL1" value="70" inputmode="numeric">
-
-        <label>Основание L2 (мм):</label>
-        <input type="number" id="flatL2" value="120" inputmode="numeric">
-
-        <label>Правая полка L3 (мм):</label>
-        <input type="number" id="flatL3" value="70" inputmode="numeric">
-
-        <button id="btnConfirmFlat" class="success">Подтвердить развёртку</button>
-      </div>
-
-      <div id="sectionBend" style="display:none;">
-        <div class="panel-section">
-          <h3>Оснастка</h3>
-          <label>Пуансон:</label>
-          <select id="punchSelect">
-            <option value="straight">Прямой (Straight)</option>
-            <option value="gooseneck">Гусиная шея (Gooseneck)</option>
-            <option value="acute">Острый (Acute 30°)</option>
-          </select>
-
-          <label>Матрица:</label>
-          <select id="dieSelect">
-            <option value="v_standard">Стандартная V-матрица</option>
-          </select>
+      <div class="card">
+        <h3>2. Параметры гиба (Отгиб)</h3>
+        <p style="font-size:0.75rem; color:#aaa; margin-bottom:8px;">Выбрана кромка: <strong id="lblEdge" style="color:#fff;">#0</strong></p>
+        
+        <div class="grid-2">
+          <div>
+            <label>Длина полки (мм)</label>
+            <input type="number" id="inpLength" value="50" min="10" max="200">
+          </div>
+          <div>
+            <label>Угол (°)</label>
+            <input type="number" id="inpAngle" value="90" min="-180" max="180">
+          </div>
         </div>
 
-        <div class="panel-section">
-          <h3>Параметры гиба</h3>
-          <label>Линия гиба:</label>
-          <select id="bendLineSelect">
-            <option value="0">Гиб #1 (Левый)</option>
-            <option value="1">Гиб #2 (Правый)</option>
-          </select>
-
-          <label>Угол (°):</label>
-          <input type="number" id="angleInput" value="90" inputmode="numeric">
-
-          <button id="btnBend">Выполнить гиб</button>
+        <div class="grid-2">
+          <div>
+            <label>Пуансон</label>
+            <select id="inpPunch"><option>Прямой</option><option>Гусь</option></select>
+          </div>
+          <div>
+            <label>Матрица</label>
+            <select id="inpDie"><option>V=16</option><option>V=12</option></select>
+          </div>
         </div>
+
+        <button id="btnAddBend">Добавить гиб (Фланец)</button>
       </div>
 
-      <div class="panel-section">
-        <button id="btnReset" class="secondary">Сбросить уровень</button>
-      </div>
-
-      <div class="panel-section">
-        <h3>История</h3>
-        <ul id="history" class="history-list"></ul>
+      <div class="card" style="flex:1;">
+        <h3>Операции</h3>
+        <ul id="opList" style="list-style:none; font-size:0.75rem; color:#aaa; font-family:monospace; line-height:1.6;"></ul>
       </div>
     </div>
   </div>
 
+  <!-- Модальное окно 3D -->
+  <div id="modal3d">
+    <header>
+      <h2 style="color:#fff; font-size:1rem;">3D Просмотр (Вращайте пальцем)</h2>
+      <button id="btnClose3D" class="danger">Закрыть</button>
+    </header>
+    <div id="container3d"></div>
+  </div>
+
   <script>
-    // Инициализация Telegram Mini App SDK
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
-      tg.expand();
-    }
+    // --- ДАННЫЕ ПРОЕКТА ---
+    let baseShapeType = 'rect'; // rect, hex, triangle
+    let basePoints = []; // Точки базового многоугольника
+    let flanges = []; // { edgeIdx, length, angle }
+    let selectedEdge = 0;
 
-    function triggerHaptic(type) {
-      if (tg?.HapticFeedback) {
-        if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
-        else if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
-        else if (type === 'impact') tg.HapticFeedback.impactOccurred('medium');
-      }
-    }
-
-    const LEVELS = [
-      {
-        id: 1,
-        title: "Уровень 1: П-образный профиль",
-        desc: "Развёртка: L1=70, L2=120, L3=70. Согните Гиб #1 на 90° и Гиб #2 на 90°.",
-        targetFlat: [70, 120, 70],
-        targetAngles: [90, 90]
-      },
-      {
-        id: 2,
-        title: "Уровень 2: Z-профиль с обходом",
-        desc: "Развёртка: L1=80, L2=100, L3=80. При гибке #2 на 90° используйте пуансон 'Гусиная шея'.",
-        targetFlat: [80, 100, 80],
-        targetAngles: [90, 90]
-      },
-      {
-        id: 3,
-        title: "Уровень 3: Замкнутый профиль",
-        desc: "Развёртка: L1=90, L2=110, L3=90. Согните Гиб #1 на 45°, Гиб #2 на 90°, затем догните #1 до 90°.",
-        targetFlat: [90, 110, 90],
-        targetAngles: [90, 90]
-      }
-    ];
-
-    let currentLevelIdx = 0;
-    let currentPhase = 'flat';
-    let sheet = { lengths: [70, 120, 70], angles: [0, 0] };
-
-    const canvas = document.getElementById('simCanvas');
+    // --- 2D CANVAS (РАЗВЁРТКА) ---
+    const canvas = document.getElementById('flatCanvas');
     const ctx = canvas.getContext('2d');
     const wrapper = document.getElementById('canvasWrapper');
 
     function resizeCanvas() {
-      const rect = wrapper.getBoundingClientRect();
-      canvas.width = Math.max(rect.width - 16, 280);
-      canvas.height = Math.max(rect.height - 16, 200);
-      render();
+      canvas.width = wrapper.clientWidth;
+      canvas.height = wrapper.clientHeight;
+      draw2D();
     }
-
     window.addEventListener('resize', resizeCanvas);
 
-    function loadLevel(idx) {
-      currentLevelIdx = idx;
-      const lvl = LEVELS[idx];
-      
-      document.getElementById('levelBadge').textContent = `Уровень ${lvl.id}`;
-      document.getElementById('taskTitle').textContent = lvl.title;
-      document.getElementById('taskDesc').textContent = lvl.desc;
+    function initBaseShape() {
+      basePoints = [];
+      flanges = [];
+      selectedEdge = 0;
+      updateOpList();
 
-      setPhase('flat');
-      document.getElementById('history').innerHTML = '';
-      sheet.angles = [0, 0];
-      
-      document.getElementById('flatL1').value = lvl.targetFlat[0];
-      document.getElementById('flatL2').value = lvl.targetFlat[1];
-      document.getElementById('flatL3').value = lvl.targetFlat[2];
-      updateFlatFromInputs();
-    }
-
-    function setPhase(phase) {
-      currentPhase = phase;
-      if (phase === 'flat') {
-        document.getElementById('tabFlat').classList.add('active');
-        document.getElementById('tabBend').classList.remove('active');
-        document.getElementById('sectionFlat').style.display = 'block';
-        document.getElementById('sectionBend').style.display = 'none';
-      } else {
-        document.getElementById('tabBend').classList.add('active');
-        document.getElementById('tabFlat').classList.remove('active');
-        document.getElementById('sectionFlat').style.display = 'none';
-        document.getElementById('sectionBend').style.display = 'block';
-      }
-      render();
-    }
-
-    function updateFlatFromInputs() {
-      sheet.lengths[0] = parseFloat(document.getElementById('flatL1').value) || 0;
-      sheet.lengths[1] = parseFloat(document.getElementById('flatL2').value) || 0;
-      sheet.lengths[2] = parseFloat(document.getElementById('flatL3').value) || 0;
-      render();
-    }
-
-    document.getElementById('flatL1').addEventListener('input', updateFlatFromInputs);
-    document.getElementById('flatL2').addEventListener('input', updateFlatFromInputs);
-    document.getElementById('flatL3').addEventListener('input', updateFlatFromInputs);
-
-    document.getElementById('btnConfirmFlat').addEventListener('click', () => {
-      const lvl = LEVELS[currentLevelIdx];
-      const match = sheet.lengths.every((val, i) => Math.abs(val - lvl.targetFlat[i]) < 0.1);
-
-      if (!match) {
-        triggerHaptic('error');
-        alert(`Размеры развёртки не совпадают с ТЗ! Необходимы: L1=${lvl.targetFlat[0]}, L2=${lvl.targetFlat[1]}, L3=${lvl.targetFlat[2]}`);
-        return;
-      }
-
-      triggerHaptic('success');
-      setPhase('bend');
-    });
-
-    function drawPunch(type, x, y) {
-      ctx.save();
-      ctx.fillStyle = '#78788c';
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-
-      if (type === 'straight') {
-        ctx.moveTo(x - 15, y - 120);
-        ctx.lineTo(x + 15, y - 120);
-        ctx.lineTo(x + 15, y - 25);
-        ctx.lineTo(x + 2, y);
-        ctx.lineTo(x - 2, y);
-        ctx.lineTo(x - 15, y - 25);
-      } else if (type === 'gooseneck') {
-        ctx.moveTo(x - 15, y - 120);
-        ctx.lineTo(x + 15, y - 120);
-        ctx.lineTo(x + 15, y - 70);
-        ctx.lineTo(x + 45, y - 50);
-        ctx.lineTo(x + 45, y - 25);
-        ctx.lineTo(x + 2, y);
-        ctx.lineTo(x - 2, y);
-        ctx.lineTo(x - 15, y - 25);
-      } else if (type === 'acute') {
-        ctx.moveTo(x - 25, y - 120);
-        ctx.lineTo(x + 25, y - 120);
-        ctx.lineTo(x + 2, y);
-        ctx.lineTo(x - 2, y);
-      }
-
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function drawDie(x, y) {
-      ctx.save();
-      ctx.fillStyle = '#484858';
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(x - 60, y + 80);
-      ctx.lineTo(x - 60, y);
-      ctx.lineTo(x - 18, y);
-      ctx.lineTo(x, y + 20);
-      ctx.lineTo(x + 18, y);
-      ctx.lineTo(x + 60, y);
-      ctx.lineTo(x + 60, y + 80);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    function getSheetPoints() {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2 + 15;
-
-      const p1 = { x: centerX - sheet.lengths[1] / 2, y: centerY };
-      const p2 = { x: centerX + sheet.lengths[1] / 2, y: centerY };
-
-      const rad1 = (sheet.angles[0] * Math.PI) / 180;
-      const p0 = {
-        x: p1.x - sheet.lengths[0] * Math.cos(rad1),
-        y: p1.y - sheet.lengths[0] * Math.sin(rad1)
-      };
-
-      const rad2 = (sheet.angles[1] * Math.PI) / 180;
-      const p3 = {
-        x: p2.x + sheet.lengths[2] * Math.cos(rad2),
-        y: p2.y - sheet.lengths[2] * Math.sin(rad2)
-      };
-
-      return [p0, p1, p2, p3];
-    }
-
-    function renderFlatCAD() {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
-      ctx.save();
-      ctx.strokeStyle = '#4da6ff';
-      ctx.lineWidth = 4;
-
-      const totalLen = sheet.lengths[0] + sheet.lengths[1] + sheet.lengths[2];
-      const startX = centerX - totalLen / 2;
-
-      ctx.beginPath();
-      ctx.moveTo(startX, centerY);
-      ctx.lineTo(startX + totalLen, centerY);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#ff3344';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-
-      const line1X = startX + sheet.lengths[0];
-      const line2X = line1X + sheet.lengths[1];
-
-      ctx.beginPath();
-      ctx.moveTo(line1X, centerY - 20); ctx.lineTo(line1X, centerY + 20);
-      ctx.moveTo(line2X, centerY - 20); ctx.lineTo(line2X, centerY + 20);
-      ctx.stroke();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '11px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`L1:${sheet.lengths[0]}`, startX + sheet.lengths[0] / 2, centerY - 12);
-      ctx.fillText(`L2:${sheet.lengths[1]}`, line1X + sheet.lengths[1] / 2, centerY - 12);
-      ctx.fillText(`L3:${sheet.lengths[2]}`, line2X + sheet.lengths[2] / 2, centerY - 12);
-
-      ctx.restore();
-    }
-
-    function renderBending() {
-      const punchType = document.getElementById('punchSelect').value;
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2 + 15;
-
-      drawDie(centerX, centerY);
-
-      const pts = getSheetPoints();
-      ctx.save();
-      ctx.strokeStyle = '#ffcc00';
-      ctx.lineWidth = 5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      ctx.lineTo(pts[1].x, pts[1].y);
-      ctx.lineTo(pts[2].x, pts[2].y);
-      ctx.lineTo(pts[3].x, pts[3].y);
-      ctx.stroke();
-      ctx.restore();
-
-      drawPunch(punchType, centerX, centerY - 6);
-    }
-
-    function render() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (currentPhase === 'flat') {
-        renderFlatCAD();
-      } else {
-        renderBending();
-      }
-    }
-
-    function checkCollision(punchType) {
-      if (punchType === 'straight') {
-        if (sheet.angles[0] > 60 || sheet.angles[1] > 60) {
-          return "СТОЛКНОВЕНИЕ: Полка врезалась в прямой пуансон! Выберите 'Гусиную шею'.";
+      if (baseShapeType === 'rect') {
+        basePoints = [[-60, -60], [60, -60], [60, 60], [-60, 60]];
+      } else if (baseShapeType === 'hex') {
+        for (let i = 0; i < 6; i++) {
+          let a = i * Math.PI / 3;
+          basePoints.push([70 * Math.cos(a), 70 * Math.sin(a)]);
+        }
+      } else if (baseShapeType === 'triangle') {
+        for (let i = 0; i < 3; i++) {
+          let a = i * (Math.PI * 2 / 3) - Math.PI/2;
+          basePoints.push([80 * Math.cos(a), 80 * Math.sin(a)]);
         }
       }
-      return null;
+      draw2D();
     }
 
-    document.getElementById('btnBend').addEventListener('click', () => {
-      const lineIndex = parseInt(document.getElementById('bendLineSelect').value);
-      const angle = parseFloat(document.getElementById('angleInput').value);
-      const punchType = document.getElementById('punchSelect').value;
+    function draw2D() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const scale = 1.5;
 
-      const prevAngle = sheet.angles[lineIndex];
-      sheet.angles[lineIndex] = angle;
+      // Отрисовка фланцев (развернутых)
+      flanges.forEach(f => {
+        const p1 = basePoints[f.edgeIdx];
+        const p2 = basePoints[(f.edgeIdx + 1) % basePoints.length];
+        
+        // Вектор кромки
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        
+        // Нормаль наружу (поворот на -90 град для экрана)
+        const len = Math.hypot(dx, dy);
+        const nx = -dy / len;
+        const ny = dx / len;
 
-      const collision = checkCollision(punchType);
+        const flen = f.length;
+        
+        // Точки фланца
+        const f1 = [p2[0], p2[1]];
+        const f2 = [p1[0], p1[1]];
+        const f3 = [p1[0] + nx * flen, p1[1] + ny * flen];
+        const f4 = [p2[0] + nx * flen, p2[1] + ny * flen];
 
-      if (collision) {
-        triggerHaptic('error');
-        alert(collision);
-        sheet.angles[lineIndex] = prevAngle;
+        ctx.fillStyle = 'rgba(77, 166, 255, 0.4)'; // Полупрозрачный синий
+        ctx.strokeStyle = '#4da6ff';
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(cx + f1[0]*scale, cy + f1[1]*scale);
+        ctx.lineTo(cx + f2[0]*scale, cy + f2[1]*scale);
+        ctx.lineTo(cx + f3[0]*scale, cy + f3[1]*scale);
+        ctx.lineTo(cx + f4[0]*scale, cy + f4[1]*scale);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // Отрисовка базовой детали
+      ctx.fillStyle = '#282833';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + basePoints[0][0]*scale, cy + basePoints[0][1]*scale);
+      for (let i = 1; i < basePoints.length; i++) {
+        ctx.lineTo(cx + basePoints[i][0]*scale, cy + basePoints[i][1]*scale);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Отрисовка кромок гиба
+      for (let i = 0; i < basePoints.length; i++) {
+        const p1 = basePoints[i];
+        const p2 = basePoints[(i + 1) % basePoints.length];
+        
+        ctx.beginPath();
+        ctx.moveTo(cx + p1[0]*scale, cy + p1[1]*scale);
+        ctx.lineTo(cx + p2[0]*scale, cy + p2[1]*scale);
+        
+        if (i === selectedEdge) {
+          ctx.strokeStyle = '#ff4d4d'; // Красная линия для выбранной кромки
+          ctx.lineWidth = 5;
+        } else {
+          ctx.strokeStyle = '#888';
+          ctx.lineWidth = 2;
+        }
+        ctx.stroke();
+
+        // Центр кромки (для клика)
+        const mx = cx + ((p1[0] + p2[0]) / 2) * scale;
+        const my = cy + ((p1[1] + p2[1]) / 2) * scale;
+        
+        if(i === selectedEdge) {
+          ctx.fillStyle = '#ff4d4d';
+          ctx.beginPath();
+          ctx.arc(mx, my, 6, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Обработка клика по 2D холсту для выбора кромки
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const scale = 1.5;
+
+      let minDist = Infinity;
+      let closestEdge = 0;
+
+      for (let i = 0; i < basePoints.length; i++) {
+        const p1 = basePoints[i];
+        const p2 = basePoints[(i + 1) % basePoints.length];
+        
+        const mx = cx + ((p1[0] + p2[0]) / 2) * scale;
+        const my = cy + ((p1[1] + p2[1]) / 2) * scale;
+
+        const dist = Math.hypot(clickX - mx, clickY - my);
+        if (dist < minDist) {
+          minDist = dist;
+          closestEdge = i;
+        }
+      }
+
+      if (minDist < 40) { // Радиус захвата клика
+        selectedEdge = closestEdge;
+        document.getElementById('lblEdge').textContent = `#${selectedEdge}`;
+        draw2D();
+        if(window.Telegram?.WebApp?.HapticFeedback) {
+           window.Telegram.WebApp.HapticFeedback.selectionChanged();
+        }
+      }
+    });
+
+    // --- UI ЛОГИКА ---
+    document.getElementById('baseShapeSel').addEventListener('change', (e) => {
+      baseShapeType = e.target.value;
+      initBaseShape();
+    });
+
+    document.getElementById('btnReset').addEventListener('click', initBaseShape);
+
+    document.getElementById('btnAddBend').addEventListener('click', () => {
+      const len = parseFloat(document.getElementById('inpLength').value);
+      const ang = parseFloat(document.getElementById('inpAngle').value);
+
+      // Проверка: есть ли уже фланец на этой кромке
+      const existingIdx = flanges.findIndex(f => f.edgeIdx === selectedEdge);
+      if (existingIdx !== -1) {
+        flanges[existingIdx] = { edgeIdx: selectedEdge, length: len, angle: ang };
       } else {
-        triggerHaptic('impact');
-        const logItem = `Гиб #${lineIndex + 1}: ${angle}° (${punchType})`;
-        const ul = document.getElementById('history');
-        const li = document.createElement('li');
-        li.textContent = logItem;
-        ul.appendChild(li);
-
-        checkLevelWin();
+        flanges.push({ edgeIdx: selectedEdge, length: len, angle: ang });
       }
 
-      render();
+      updateOpList();
+      draw2D();
+      
+      if(window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      }
     });
 
-    function checkLevelWin() {
-      const lvl = LEVELS[currentLevelIdx];
-      const win = sheet.angles.every((a, idx) => Math.abs(a - lvl.targetAngles[idx]) < 0.1);
-
-      if (win) {
-        triggerHaptic('success');
-        setTimeout(() => {
-          alert(`Уровень ${lvl.id} пройден!`);
-          if (currentLevelIdx + 1 < LEVELS.length) {
-            loadLevel(currentLevelIdx + 1);
-          } else {
-            alert("Поздравляем! Все уровни пройдены.");
-          }
-        }, 100);
-      }
+    function updateOpList() {
+      const ul = document.getElementById('opList');
+      ul.innerHTML = '';
+      flanges.forEach((f, i) => {
+        const li = document.createElement('li');
+        li.textContent = `Гиб ${i+1}: Кромка #${f.edgeIdx} | L=${f.length} | ∠${f.angle}°`;
+        ul.appendChild(li);
+      });
     }
 
-    document.getElementById('btnReset').addEventListener('click', () => {
-      loadLevel(currentLevelIdx);
+    // --- THREE.JS (3D РЕНДЕР) ---
+    let scene, camera, renderer, controls, sheetGroup;
+
+    function init3D() {
+      const container = document.getElementById('container3d');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x181822);
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1000);
+      camera.position.set(150, -200, 150);
+      camera.up.set(0, 0, 1); // Z - вверх
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // Освещение
+      const ambLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+      dirLight.position.set(100, 100, 200);
+      scene.add(dirLight);
+
+      // Сетка
+      const grid = new THREE.GridHelper(400, 20, 0x444455, 0x222233);
+      grid.rotation.x = Math.PI / 2;
+      scene.add(grid);
+
+      sheetGroup = new THREE.Group();
+      scene.add(sheetGroup);
+
+      animate3D();
+    }
+
+    function build3DModel() {
+      // Очистка старой модели
+      while(sheetGroup.children.length > 0){ 
+          sheetGroup.remove(sheetGroup.children[0]); 
+      }
+
+      const material = new THREE.MeshStandardMaterial({ 
+        color: 0x82b1ff, 
+        metalness: 0.6, 
+        roughness: 0.4,
+        side: THREE.DoubleSide 
+      });
+
+      // 1. Строим базу
+      const shape = new THREE.Shape();
+      shape.moveTo(basePoints[0][0], basePoints[0][1]);
+      for (let i = 1; i < basePoints.length; i++) {
+        shape.lineTo(basePoints[i][0], basePoints[i][1]);
+      }
+      const baseGeo = new THREE.ShapeGeometry(shape);
+      const baseMesh = new THREE.Mesh(baseGeo, material);
+      sheetGroup.add(baseMesh);
+
+      // 2. Строим фланцы
+      flanges.forEach(f => {
+        const p1 = basePoints[f.edgeIdx];
+        const p2 = basePoints[(f.edgeIdx + 1) % basePoints.length];
+        
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const width = Math.hypot(dx, dy);
+        const alpha = Math.atan2(dy, dx);
+
+        // Шарнир (Pivot) на стартовой точке кромки
+        const pivot = new THREE.Group();
+        pivot.position.set(p1[0], p1[1], 0);
+        pivot.rotation.z = alpha; // Выравниваем ось X по кромке
+        
+        // Геометрия фланца. Сдвигаем, чтобы нижний край был на оси X
+        const flen = f.length;
+        const flangeGeo = new THREE.PlaneGeometry(width, flen);
+        flangeGeo.translate(width/2, -flen/2, 0); // В Three.js Y идет вверх в локальных, нам нужно наружу
+
+        const flangeMesh = new THREE.Mesh(flangeGeo, material);
+        
+        // Гиб: Вращение шарнира вокруг локальной оси X
+        // Положительный угол загибает "вверх" (по оси Z)
+        pivot.rotation.x = f.angle * Math.PI / 180;
+
+        pivot.add(flangeMesh);
+        sheetGroup.add(pivot);
+      });
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // --- УПРАВЛЕНИЕ ОКНОМ 3D ---
+    document.getElementById('btnOpen3D').addEventListener('click', () => {
+      document.getElementById('modal3d').style.display = 'flex';
+      if(!scene) init3D();
+      build3DModel();
     });
 
-    document.getElementById('punchSelect').addEventListener('change', render);
-    document.getElementById('dieSelect').addEventListener('change', render);
+    document.getElementById('btnClose3D').addEventListener('click', () => {
+      document.getElementById('modal3d').style.display = 'none';
+    });
 
-    // Первоначальный запуск
+    // --- СТАРТ ---
     setTimeout(() => {
       resizeCanvas();
-      loadLevel(0);
+      initBaseShape();
     }, 100);
   </script>
 </body>

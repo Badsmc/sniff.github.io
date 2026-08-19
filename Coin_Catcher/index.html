@@ -13,12 +13,12 @@
             <span id="day-counter">День: 1</span>
             <span id="net-worth">Капитал: $1000</span>
         </div>
-        <div id="news-ticker">Ожидание новостей...</div>
+        <div id="news-ticker">Рынок стабилен</div>
     </div>
     
     <canvas id="chartCanvas"></canvas>
     
-    <!-- Панель трейдера (заработок) -->
+    <!-- Панель трейдера -->
     <div id="trader-panel" class="panel">
         <div class="panel-title">Ваш портфель</div>
         <div class="portfolio-stats">
@@ -31,7 +31,7 @@
         </div>
     </div>
 
-    <!-- Панель маркетмейкера (управление рынком) -->
+    <!-- Панель маркетмейкера -->
     <div id="mm-panel" class="panel">
         <div class="panel-title">Бюджет ММ (обновляется 1 раз в день)</div>
         <div class="energy-bar"><div id="energy-fill"></div></div>
@@ -41,11 +41,23 @@
         </div>
     </div>
 
-    <div id="game-over" class="hidden">
-        <h2>Рынок рухнул!</h2>
-        <div id="final-score">Прожито дней: 0</div>
-        <div id="final-money">Итоговый капитал: $0</div>
-        <button id="btn-restart">Играть снова</button>
+    <!-- Всплывающее окно новостей -->
+    <div id="news-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>СРОЧНАЯ НОВОСТЬ</h3>
+            <p id="news-modal-text">Текст новости</p>
+            <button id="btn-continue" class="btn blue">Понятно</button>
+        </div>
+    </div>
+
+    <!-- Экран проигрыша -->
+    <div id="game-over" class="modal hidden">
+        <div class="modal-content">
+            <h2>Рынок рухнул!</h2>
+            <div id="final-score">Прожито дней: 0</div>
+            <div id="final-money">Итоговый капитал: $0</div>
+            <button id="btn-restart" class="btn green">Играть снова</button>
+        </div>
     </div>
 
     <script src="game.js"></script>

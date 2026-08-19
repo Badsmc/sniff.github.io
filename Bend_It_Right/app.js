@@ -29,6 +29,7 @@ let baseShapeType = 'rect';
 let basePoints = []; 
 let flangesByEdge = {}; 
 let selectedEdge = 0;
+const SHEET_THICKNESS = 1.5; // Толщина листового металла (мм)
 
 // DOM Элементы
 const canvas = document.getElementById('flatCanvas');
@@ -42,7 +43,7 @@ async function loadData() {
     if (!response.ok) throw new Error("Network error");
     gameData = await response.json();
   } catch (error) {
-    console.warn("Не удалось загрузить data.json через fetch. Использование встроенных данных по умолчанию.", error);
+    console.warn("Использование локального fallback конфигурации.", error);
     gameData = DEFAULT_DATA;
   }
   populateSelects();
@@ -310,7 +311,6 @@ document.getElementById('btnToggleSign').addEventListener('click', () => {
   if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
 });
 
-// Глобальные функции для Inline HTML вызовов
 window.setAngle = function(deg) {
   document.getElementById('inpAngle').value = deg;
   if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
@@ -348,7 +348,7 @@ function updateOpList() {
   });
 }
 
-// --- THREE.JS (3D РЕНДЕР) ---
+// --- THREE.JS (3D РЕНДЕР С ОЧИСТКОЙ ПЕРЕСЕЧЕНИЙ) ---
 let scene, camera, renderer, controls, sheetGroup;
 let is3DInit = false;
 
@@ -397,17 +397,28 @@ function build3DModel() {
     side: THREE.DoubleSide 
   });
 
-  // Базовый полиگون
+  const CSG = window.ThreeBVHCSG || window.CSG;
+  let evaluator = null;
+  if (CSG && CSG.Evaluator) {
+    evaluator = new CSG.Evaluator();
+  }
+
+  const meshesToCombine = [];
+  const extrudeSettings = { depth: SHEET_THICKNESS, bevelEnabled: false };
+
+  // 1. Основание с толщиной
   const shape = new THREE.Shape();
   shape.moveTo(basePoints[0][0], basePoints[0][1]);
   for (let i = 1; i < basePoints.length; i++) {
     shape.lineTo(basePoints[i][0], basePoints[i][1]);
   }
-  const baseGeo = new THREE.ShapeGeometry(shape);
+  
+  const baseGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
   const baseMesh = new THREE.Mesh(baseGeo, material);
-  sheetGroup.add(baseMesh);
+  baseMesh.updateMatrixWorld(true);
+  meshesToCombine.push(baseMesh);
 
-  // Цепочки гибов
+  // 2. Цепочки гибов
   for (let edgeIdx = 0; edgeIdx < basePoints.length; edgeIdx++) {
     const chain = flangesByEdge[edgeIdx];
     if (!chain || chain.length === 0) continue;
@@ -444,13 +455,22 @@ function build3DModel() {
       segPivot.rotation.x = bendSign * (seg.angle * Math.PI / 180);
 
       const flen = seg.length;
-      const flangeGeo = new THREE.PlaneGeometry(width, flen);
-      flangeGeo.translate(width / 2, -flen / 2, 0);
+      
+      const flangeShape = new THREE.Shape();
+      flangeShape.moveTo(0, 0);
+      flangeShape.lineTo(width, 0);
+      flangeShape.lineTo(width, -flen);
+      flangeShape.lineTo(0, -flen);
+      flangeShape.closePath();
 
+      const flangeGeo = new THREE.ExtrudeGeometry(flangeShape, extrudeSettings);
       const flangeMesh = new THREE.Mesh(flangeGeo, material);
-      segPivot.add(flangeMesh);
 
+      segPivot.add(flangeMesh);
       currentParent.add(segPivot);
+
+      flangeMesh.updateMatrixWorld(true);
+      meshesToCombine.push(flangeMesh);
 
       const nextParent = new THREE.Group();
       nextParent.position.set(0, -flen, 0);
@@ -458,6 +478,33 @@ function build3DModel() {
 
       currentParent = nextParent;
     });
+  }
+
+  // 3. Удаление пересечений через CSG Union
+  if (evaluator && meshesToCombine.length > 1 && window.ThreeBVHCSG) {
+    try {
+      const { Brush, UNION } = window.ThreeBVHCSG;
+      
+      let resultBrush = new Brush(meshesToCombine[0].geometry, material);
+      resultBrush.matrix.copy(meshesToCombine[0].matrixWorld);
+      resultBrush.matrix.decompose(resultBrush.position, resultBrush.quaternion, resultBrush.scale);
+
+      for (let i = 1; i < meshesToCombine.length; i++) {
+        const nextBrush = new Brush(meshesToCombine[i].geometry, material);
+        nextBrush.matrix.copy(meshesToCombine[i].matrixWorld);
+        nextBrush.matrix.decompose(nextBrush.position, nextBrush.quaternion, nextBrush.scale);
+
+        resultBrush = evaluator.evaluate(resultBrush, nextBrush, UNION);
+      }
+
+      while (sheetGroup.children.length > 0) { 
+        sheetGroup.remove(sheetGroup.children[0]); 
+      }
+      sheetGroup.add(resultBrush);
+      return;
+    } catch (e) {
+      console.warn("Ошибка обработчика CSG:", e);
+    }
   }
 }
 

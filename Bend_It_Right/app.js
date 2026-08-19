@@ -75,14 +75,12 @@ function getEdgeChain2DPolygons(edgeIdx) {
   const len = Math.hypot(dx, dy);
 
   // Вектор нормали строго наружу от базового полигона
-  // Центр базовой формы примерно в (0,0)
   const midX = (p1[0] + p2[0]) / 2;
   const midY = (p1[1] + p2[1]) / 2;
 
   let nx = -dy / len;
   let ny = dx / len;
 
-  // Если нормаль смотрит внутрь к центру (0,0), переворачиваем ее
   if (midX * nx + midY * ny < 0) {
     nx = -nx;
     ny = -ny;
@@ -288,6 +286,20 @@ document.getElementById('btnAddBend').addEventListener('click', () => {
   if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 });
 
+// Инверсия знака угла (+ / -)
+document.getElementById('btnToggleSign').addEventListener('click', () => {
+  const inp = document.getElementById('inpAngle');
+  let val = parseFloat(inp.value) || 0;
+  inp.value = -val;
+  if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+});
+
+// Установка угла из кнопок пресетов
+function setAngle(deg) {
+  document.getElementById('inpAngle').value = deg;
+  if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+}
+
 function updateOpList() {
   const ul = document.getElementById('opList');
   ul.innerHTML = '';
@@ -391,7 +403,6 @@ function build3DModel() {
     const dy = p2[1] - p1[1];
     const width = Math.hypot(dx, dy);
 
-    // Центр основания для точной ориентации нормали наружу
     const midX = (p1[0] + p2[0]) / 2;
     const midY = (p1[1] + p2[1]) / 2;
 
@@ -402,30 +413,24 @@ function build3DModel() {
       outY = -outY;
     }
 
-    // Вектор кромки
     const edgeX = p2[0] - p1[0];
     const edgeY = p2[1] - p1[1];
     const edgeAngle = Math.atan2(edgeY, edgeX);
 
-    // Первоначальный корень кромки
     let currentParent = new THREE.Group();
     currentParent.position.set(p1[0], p1[1], 0);
     currentParent.rotation.z = edgeAngle;
     sheetGroup.add(currentParent);
 
-    // Флаг совпадения направления векторного обхода с наружной нормалью
-    // Гарантирует, что угол +90° ВСЕГДА гнет вверх по Z для всех сторон коробки
     const localOutY = -Math.sin(edgeAngle) * outX + Math.cos(edgeAngle) * outY;
     const bendSign = localOutY < 0 ? -1 : 1;
 
     chain.forEach(seg => {
       const segPivot = new THREE.Group();
-      // Поворачиваем вокруг оси кромки (локальная ось X)
       segPivot.rotation.x = bendSign * (seg.angle * Math.PI / 180);
 
       const flen = seg.length;
       const flangeGeo = new THREE.PlaneGeometry(width, flen);
-      // Сдвигаем геометрию от шарнира наружу
       flangeGeo.translate(width / 2, -flen / 2, 0);
 
       const flangeMesh = new THREE.Mesh(flangeGeo, material);
@@ -433,7 +438,6 @@ function build3DModel() {
 
       currentParent.add(segPivot);
 
-      // Следующий шарнир смещается на конец текущей полки
       const nextParent = new THREE.Group();
       nextParent.position.set(0, -flen, 0);
       segPivot.add(nextParent);

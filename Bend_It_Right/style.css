@@ -50,3 +50,46 @@ button.danger { background: #ff4d4d; color: #fff; }
 #modal3d header { background: #111; border-bottom: 1px solid #333; }
 #modal3d header h2 { color: #fff; font-size: 0.9rem; }
 #container3d { flex: 1; width: 100%; position: relative; }
+
+.angle-input-group {
+  display: flex;
+  gap: 4px;
+}
+
+.angle-input-group input {
+  margin-bottom: 0;
+}
+
+.btn-sm {
+  width: 40px !important;
+  height: 38px !important;
+  margin-top: 0 !important;
+  background: #3a3a4a !important;
+  color: #fff !important;
+  font-size: 1rem !important;
+  border: 1px solid var(--border) !important;
+}
+
+.angle-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 6px 0 10px 0;
+}
+
+.btn-preset {
+  height: 28px !important;
+  margin-top: 0 !important;
+  background: #2a2a36 !important;
+  color: #4da6ff !important;
+  font-size: 0.75rem !important;
+  border: 1px solid #3a3a4a !important;
+  border-radius: 4px !important;
+  font-weight: normal !important;
+}
+
+.btn-preset:active {
+  background: var(--accent) !important;
+  color: #000 !important;
+}
+

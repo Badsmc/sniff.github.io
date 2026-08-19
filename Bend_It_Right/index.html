@@ -9,10 +9,13 @@
   
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  
   <!-- Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- OrbitControls -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Three-bvh-csg для удаления пересечений -->
+  <script src="https://unpkg.com/three-bvh-csg@0.3.6/build/index.umd.js"></script>
 </head>
 <body>
 
@@ -22,18 +25,22 @@
   </header>
 
   <div class="app-container">
+    <!-- Зона 2D Развёртки -->
     <div class="editor-zone" id="canvasWrapper">
       <div class="hint-overlay">Кликните на кромку детали, чтобы выбрать линию гиба</div>
       <canvas id="flatCanvas"></canvas>
     </div>
 
+    <!-- Панель управления -->
     <div class="controls-zone">
+      <!-- 1. Форма основания -->
       <div class="card">
         <h3>1. Форма основания</h3>
         <select id="baseShapeSel"></select>
         <button id="btnReset" class="danger">Сбросить деталь</button>
       </div>
 
+      <!-- 2. Параметры гиба -->
       <div class="card">
         <h3>2. Параметры гиба (Отгиб)</h3>
         <p class="edge-info">Выбрана кромка: <strong id="lblEdge">#0</strong></p>
@@ -52,6 +59,7 @@
           </div>
         </div>
 
+        <!-- Быстрые пресеты углов -->
         <div class="angle-presets">
           <button type="button" onclick="window.setAngle(-90)" class="btn-preset">-90°</button>
           <button type="button" onclick="window.setAngle(-45)" class="btn-preset">-45°</button>
@@ -73,6 +81,7 @@
         <button id="btnAddBend">Добавить гиб (Фланец)</button>
       </div>
 
+      <!-- 3. Список операций для активной кромки -->
       <div class="card" style="flex: 1;">
         <h3>Операции активной кромки</h3>
         <ul id="opList"></ul>
@@ -80,6 +89,7 @@
     </div>
   </div>
 
+  <!-- Модальное окно 3D Просмотра -->
   <div id="modal3d">
     <header>
       <h2>3D Просмотр (Вращайте пальцем)</h2>

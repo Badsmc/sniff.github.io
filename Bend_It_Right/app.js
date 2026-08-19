@@ -2,32 +2,51 @@
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// --- ГЛОБАЛЬНЫЕ ДАННЫЕ ---
+// --- ГЛОБАЛЬНЫЕ ДАННЫЕ И FALLBACK ---
+const DEFAULT_DATA = {
+  shapes: {
+    rect: {
+      name: "Квадрат (Коробка)",
+      points: [[-60, -60], [60, -60], [60, 60], [-60, 60]]
+    },
+    hex: {
+      name: "Шестигранник",
+      points: [[70, 0], [35, 60.62], [-35, 60.62], [-70, 0], [-35, -60.62], [35, -60.62]]
+    },
+    triangle: {
+      name: "Треугольник",
+      points: [[0, -80], [69.28, 40], [-69.28, 40]]
+    }
+  },
+  tools: {
+    punches: ["Прямой", "Гусиная шея", "Острый 30°"],
+    dies: ["V=16", "V=12", "V=8"]
+  }
+};
+
 let gameData = null;
 let baseShapeType = 'rect'; 
-let basePoints = []; // Точки базового контура [[x, y], ...]
-
-// Храним цепочки гибов для КАЖДОЙ кромки отдельно
-// flangesByEdge = { edgeIdx: [ { length: 50, angle: 90 }, { length: 20, angle: 90 }, ... ] }
+let basePoints = []; 
 let flangesByEdge = {}; 
 let selectedEdge = 0;
 
-// --- DOM ЭЛЕМЕНТЫ ---
+// DOM Элементы
 const canvas = document.getElementById('flatCanvas');
 const ctx = canvas.getContext('2d');
 const wrapper = document.getElementById('canvasWrapper');
 
-// --- ЗАГРУЗКА JSON ---
+// --- ЗАГРУЗКА ДАННЫХ ---
 async function loadData() {
   try {
     const response = await fetch('data.json');
+    if (!response.ok) throw new Error("Network error");
     gameData = await response.json();
-    populateSelects();
-    initBaseShape();
   } catch (error) {
-    console.error("Ошибка загрузки data.json:", error);
-    alert("Запустите через локальный веб-сервер (Live Server).");
+    console.warn("Не удалось загрузить data.json через fetch. Использование встроенных данных по умолчанию.", error);
+    gameData = DEFAULT_DATA;
   }
+  populateSelects();
+  initBaseShape();
 }
 
 function populateSelects() {
@@ -51,21 +70,23 @@ function populateSelects() {
 
 // --- 2D CANVAS ---
 new ResizeObserver(() => {
-  canvas.width = wrapper.clientWidth;
-  canvas.height = wrapper.clientHeight;
-  if (basePoints.length > 0) draw2D();
+  if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+    canvas.width = wrapper.clientWidth;
+    canvas.height = wrapper.clientHeight;
+    if (basePoints.length > 0) draw2D();
+  }
 }).observe(wrapper);
 
 function initBaseShape() {
   baseShapeType = document.getElementById('baseShapeSel').value;
-  basePoints = gameData.shapes[baseShapeType].points;
+  basePoints = gameData.shapes[baseShapeType] ? gameData.shapes[baseShapeType].points : gameData.shapes['rect'].points;
   flangesByEdge = {};
   selectedEdge = 0;
+  document.getElementById('lblEdge').textContent = `#${selectedEdge}`;
   updateOpList();
   draw2D();
 }
 
-// Расчёт полигонов всей цепочки гибов для 2D развёртки
 function getEdgeChain2DPolygons(edgeIdx) {
   const p1 = basePoints[edgeIdx];
   const p2 = basePoints[(edgeIdx + 1) % basePoints.length];
@@ -74,7 +95,6 @@ function getEdgeChain2DPolygons(edgeIdx) {
   const dy = p2[1] - p1[1];
   const len = Math.hypot(dx, dy);
 
-  // Вектор нормали строго наружу от базового полигона
   const midX = (p1[0] + p2[0]) / 2;
   const midY = (p1[1] + p2[1]) / 2;
 
@@ -115,7 +135,6 @@ function draw2D() {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
 
-  // Автомасштаб
   let minX = -80, maxX = 80, minY = -80, maxY = 80;
   basePoints.forEach(p => {
     minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
@@ -136,7 +155,7 @@ function draw2D() {
   const boundingH = maxY - minY;
   const scale = Math.min((canvas.width - 80) / boundingW, (canvas.height - 80) / boundingH, 1.5);
 
-  // 1. Рисуем баковую деталь
+  // Базовая деталь
   ctx.fillStyle = '#282835';
   ctx.strokeStyle = '#555566';
   ctx.lineWidth = 2;
@@ -149,7 +168,7 @@ function draw2D() {
   ctx.fill();
   ctx.stroke();
 
-  // 2. Рисуем развёртку всех цепочек полок
+  // Развёртка полок
   for (let e = 0; e < basePoints.length; e++) {
     const polys = getEdgeChain2DPolygons(e);
     polys.forEach((item, idx) => {
@@ -166,7 +185,6 @@ function draw2D() {
       ctx.fill();
       ctx.stroke();
 
-      // Линии гибов внутри цепочки
       if (idx > 0) {
         ctx.strokeStyle = '#ffcc00';
         ctx.setLineDash([4, 4]);
@@ -179,7 +197,7 @@ function draw2D() {
     });
   }
 
-  // 3. Линии базовых кромок
+  // Базовые кромки
   for (let i = 0; i < basePoints.length; i++) {
     const p1 = basePoints[i];
     const p2 = basePoints[(i + 1) % basePoints.length];
@@ -270,7 +288,6 @@ canvas.addEventListener('pointerdown', (e) => {
 document.getElementById('baseShapeSel').addEventListener('change', initBaseShape);
 document.getElementById('btnReset').addEventListener('click', initBaseShape);
 
-// Добавить гиб в цепочку выбранной кромки
 document.getElementById('btnAddBend').addEventListener('click', () => {
   const len = parseFloat(document.getElementById('inpLength').value);
   const ang = parseFloat(document.getElementById('inpAngle').value);
@@ -286,7 +303,6 @@ document.getElementById('btnAddBend').addEventListener('click', () => {
   if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 });
 
-// Инверсия знака угла (+ / -)
 document.getElementById('btnToggleSign').addEventListener('click', () => {
   const inp = document.getElementById('inpAngle');
   let val = parseFloat(inp.value) || 0;
@@ -294,11 +310,19 @@ document.getElementById('btnToggleSign').addEventListener('click', () => {
   if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
 });
 
-// Установка угла из кнопок пресетов
-function setAngle(deg) {
+// Глобальные функции для Inline HTML вызовов
+window.setAngle = function(deg) {
   document.getElementById('inpAngle').value = deg;
   if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
-}
+};
+
+window.removeBend = function(index) {
+  if (flangesByEdge[selectedEdge]) {
+    flangesByEdge[selectedEdge].splice(index, 1);
+    updateOpList();
+    draw2D();
+  }
+};
 
 function updateOpList() {
   const ul = document.getElementById('opList');
@@ -318,18 +342,10 @@ function updateOpList() {
 
     li.innerHTML = `
       <span>Гиб ${i + 1}: L=${f.length}мм | ∠${f.angle}°</span>
-      <button onclick="removeBend(${i})" style="width: auto; height: 22px; padding: 0 6px; margin: 0; background: #ff4d4d; color: #fff; font-size: 0.7rem;">✕</button>
+      <button onclick="window.removeBend(${i})" style="width: auto; height: 22px; padding: 0 6px; margin: 0; background: #ff4d4d; color: #fff; font-size: 0.7rem;">✕</button>
     `;
     ul.appendChild(li);
   });
-}
-
-function removeBend(index) {
-  if (flangesByEdge[selectedEdge]) {
-    flangesByEdge[selectedEdge].splice(index, 1);
-    updateOpList();
-    draw2D();
-  }
 }
 
 // --- THREE.JS (3D РЕНДЕР) ---
@@ -381,7 +397,7 @@ function build3DModel() {
     side: THREE.DoubleSide 
   });
 
-  // 1. Базовый полигон
+  // Базовый полиگون
   const shape = new THREE.Shape();
   shape.moveTo(basePoints[0][0], basePoints[0][1]);
   for (let i = 1; i < basePoints.length; i++) {
@@ -391,7 +407,7 @@ function build3DModel() {
   const baseMesh = new THREE.Mesh(baseGeo, material);
   sheetGroup.add(baseMesh);
 
-  // 2. Построение цепочек гибов
+  // Цепочки гибов
   for (let edgeIdx = 0; edgeIdx < basePoints.length; edgeIdx++) {
     const chain = flangesByEdge[edgeIdx];
     if (!chain || chain.length === 0) continue;
@@ -413,9 +429,7 @@ function build3DModel() {
       outY = -outY;
     }
 
-    const edgeX = p2[0] - p1[0];
-    const edgeY = p2[1] - p1[1];
-    const edgeAngle = Math.atan2(edgeY, edgeX);
+    const edgeAngle = Math.atan2(dy, dx);
 
     let currentParent = new THREE.Group();
     currentParent.position.set(p1[0], p1[1], 0);
@@ -453,7 +467,6 @@ function animate3D() {
   renderer.render(scene, camera);
 }
 
-// Показ модального окна 3D
 document.getElementById('btnOpen3D').addEventListener('click', () => {
   document.getElementById('modal3d').style.display = 'flex';
   if (!is3DInit) init3D();
@@ -470,5 +483,4 @@ document.getElementById('btnClose3D').addEventListener('click', () => {
   document.getElementById('modal3d').style.display = 'none';
 });
 
-// Старт
 window.onload = loadData;

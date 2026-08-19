@@ -6,51 +6,207 @@
   --border: #383845;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
-body { font-family: -apple-system, sans-serif; background: var(--bg); color: #fff; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
-header { background: var(--panel); padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-h1 { font-size: 1.1rem; color: var(--accent); }
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
 
-.btn-header { width: auto; height: 32px; padding: 0 12px; margin: 0; font-size: 0.85rem; }
+/* Шапка приложения */
+header {
+  background: var(--panel);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  height: 44px;
+}
 
-.app-container { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
-@media(min-width: 768px) { .app-container { flex-direction: row; } }
+h1 {
+  font-size: 1.1rem;
+  color: var(--accent);
+}
 
-/* 2D Canvas Area */
-.editor-zone { flex: 1; display: flex; position: relative; background: #0d0d10; min-height: 250px; }
-#flatCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
-.hint-overlay { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 4px; font-size: 0.75rem; pointer-events: none; border: 1px solid var(--border); z-index: 10; }
+.btn-header {
+  width: auto !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
+  font-size: 0.85rem !important;
+}
 
-/* Controls Area */
-.controls-zone { width: 100%; background: var(--panel); padding: 12px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); overflow-y: auto; max-height: 50vh; }
-@media(min-width: 768px) { .controls-zone { width: 340px; border-top: none; border-left: 1px solid var(--border); max-height: 100%; } }
+/* Главный контейнер */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
 
-.card { background: var(--card); padding: 12px; border-radius: 6px; border: 1px solid var(--border); flex-shrink: 0; }
-.card h3 { font-size: 0.8rem; text-transform: uppercase; color: #889; margin-bottom: 10px; }
-.op-card { flex: 1; min-height: 120px; }
+@media (min-width: 768px) {
+  .app-container {
+    flex-direction: row;
+  }
+}
 
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-label { display: block; font-size: 0.75rem; color: #bbb; margin-bottom: 4px; }
-select, input { width: 100%; height: 38px; background: var(--bg); border: 1px solid var(--border); color: #fff; border-radius: 4px; padding: 0 8px; font-size: 0.9rem; margin-bottom: 8px; }
+/* Зона 2D Графики (Canvas) */
+.editor-zone {
+  flex: 1;
+  display: flex;
+  position: relative;
+  background: #0d0d10;
+  min-height: 240px;
+  touch-action: none;
+}
 
-button { width: 100%; height: 42px; background: var(--accent); color: #000; border: none; border-radius: 4px; font-weight: bold; font-size: 0.95rem; cursor: pointer; margin-top: 4px; display: flex; justify-content: center; align-items: center; }
-button:active { opacity: 0.8; }
-button.success { background: #00e676; }
-button.danger { background: #ff4d4d; color: #fff; }
+#flatCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
 
-.edge-info { font-size: 0.75rem; color: #aaa; margin-bottom: 8px; }
-#lblEdge { color: #fff; font-size: 0.9rem; }
+.hint-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  pointer-events: none;
+  border: 1px solid var(--border);
+  z-index: 10;
+  color: #ccc;
+}
 
-#opList { list-style: none; font-size: 0.75rem; color: #aaa; font-family: monospace; line-height: 1.8; overflow-y: auto; max-height: 150px; }
-#opList li { border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+/* Зона управления */
+.controls-zone {
+  width: 100%;
+  background: var(--panel);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: 50vh;
+}
 
-/* 3D Modal Window */
-#modal3d { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; display: none; flex-direction: column; }
-#modal3d header { background: #111; border-bottom: 1px solid #333; }
-#modal3d header h2 { color: #fff; font-size: 0.9rem; }
-#container3d { flex: 1; width: 100%; position: relative; }
+@media (min-width: 768px) {
+  .controls-zone {
+    width: 340px;
+    border-top: none;
+    border-left: 1px solid var(--border);
+    max-height: 100%;
+  }
+}
 
+.card {
+  background: var(--card);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.card h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888899;
+  margin-bottom: 8px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+label {
+  display: block;
+  font-size: 0.75rem;
+  color: #bbb;
+  margin-bottom: 4px;
+}
+
+select, input {
+  width: 100%;
+  height: 38px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: #fff;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+  outline: none;
+}
+
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+
+button {
+  width: 100%;
+  height: 42px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.15s;
+}
+
+button:active {
+  opacity: 0.8;
+}
+
+button.success {
+  background: #00e676;
+  color: #000;
+}
+
+button.danger {
+  background: #ff4d4d;
+  color: #fff;
+}
+
+.edge-info {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+#lblEdge {
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+/* Группа ввода угла и кнопка знака ± */
 .angle-input-group {
   display: flex;
   gap: 4px;
@@ -68,8 +224,11 @@ button.danger { background: #ff4d4d; color: #fff; }
   color: #fff !important;
   font-size: 1rem !important;
   border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  flex-shrink: 0;
 }
 
+/* Пресеты углов (-90°, -45°, 45°, 90°) */
 .angle-presets {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -81,7 +240,7 @@ button.danger { background: #ff4d4d; color: #fff; }
   height: 28px !important;
   margin-top: 0 !important;
   background: #2a2a36 !important;
-  color: #4da6ff !important;
+  color: var(--accent) !important;
   font-size: 0.75rem !important;
   border: 1px solid #3a3a4a !important;
   border-radius: 4px !important;
@@ -93,3 +252,47 @@ button.danger { background: #ff4d4d; color: #fff; }
   color: #000 !important;
 }
 
+/* Список операций */
+#opList {
+  list-style: none;
+  font-size: 0.75rem;
+  color: #aaa;
+  font-family: monospace;
+  line-height: 1.8;
+  overflow-y: auto;
+  max-height: 130px;
+}
+
+#opList li {
+  border-bottom: 1px solid var(--border);
+  padding: 3px 0;
+}
+
+/* 3D Модальное окно */
+#modal3d {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+}
+
+#modal3d header {
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+
+#modal3d header h2 {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+#container3d {
+  flex: 1;
+  width: 100%;
+  position: relative;
+}

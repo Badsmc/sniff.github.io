@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AR Glitch Catcher</title>
+<style>
+  body { 
+    margin: 0; padding: 0; background-color: #f4f4f9; 
+    font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; 
+  }
+  #game-container { 
+    position: relative; width: 100vw; height: 100vh; background: #e0e5ec;
+    border: 4px solid #333; box-sizing: border-box;
+  }
+  #overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 255, 0, 0.05); pointer-events: none;
+    box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.2);
+  }
+  .entity { 
+    position: absolute; width: 70px; height: 70px; 
+    border-radius: 12px; display: flex; justify-content: center; align-items: center; 
+    font-size: 30px; user-select: none; cursor: pointer;
+  }
+  .work { background: #95a5a6; border: 2px solid #7f8c8d; }
+  .glitch { background: rgba(255, 0, 100, 0.2); font-size: 40px; animation: jitter 0.2s infinite; }
+  
+  @keyframes jitter {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    50% { transform: translate(-1px, -2px) rotate(-2deg); }
+    100% { transform: translate(-3px, 0px) rotate(2deg); }
+  }
+
+  #ui { 
+    position: absolute; top: 10px; left: 15px; right: 15px; 
+    display: flex; justify-content: space-between; font-size: 18px; 
+    font-weight: bold; color: #333; pointer-events: none; z-index: 10;
+  }
+  #game-over { 
+    display: none; position: absolute; top: 50%; left: 50%; 
+    transform: translate(-50%, -50%); background: #fff; 
+    padding: 20px; border-radius: 12px; text-align: center; width: 70%; 
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 20;
+  }
+  button { 
+    padding: 12px 24px; font-size: 16px; font-weight: bold; 
+    background: #2c3e50; color: white; border: none; 
+    border-radius: 8px; margin-top: 15px; cursor: pointer; 
+  }
+  button:active { background: #34495e; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+  <div id="overlay"></div>
+  <div id="ui">
+    <span>Score: <span id="score">0</span></span>
+    <span>Battery: <span id="lives">100</span>%</span>
+  </div>
+  <div id="game-over">
+    <h2>Система перегружена</h2>
+    <p>Ваш счет: <span id="final-score">0</span></p>
+    <button onclick="startGame()">Перезагрузить AR</button>
+  </div>
+</div>
+
+<script>
+  let score = 0;
+  let lives = 100;
+  let gameInterval;
+  let entities = [];
+  const container = document.getElementById('game-container');
+  const glitches = ['🐹', '🌭', '🤡', '👽', '👾'];
+
+  function startGame() {
+    document.getElementById('game-over').style.display = 'none';
+    document.querySelectorAll('.entity').forEach(e => e.remove());
+    entities = [];
+    score = 0;
+    lives = 100;
+    updateUI();
+    clearInterval(gameInterval);
+    gameInterval = setInterval(spawnEntity, 800);
+    requestAnimationFrame(gameLoop);
+  }
+
+  function spawnEntity() {
+    if (lives <= 0) return;
+    const isGlitch = Math.random() > 0.4;
+    const el = document.createElement('div');
+    el.className = 'entity ' + (isGlitch ? 'glitch' : 'work');
+    el.innerText = isGlitch ? glitches[Math.floor(Math.random() * glitches.length)] : '📄';
+    
+    const x = Math.random() * (window.innerWidth - 70);
+    el.style.left = x + 'px';
+    el.style.top = '-80px';
+    el.dataset.type = isGlitch ? 'glitch' : 'work';
+    
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); handleTap(el); });
+    el.addEventListener('mousedown', () => handleTap(el));
+    
+    container.appendChild(el);
+    entities.push({ el: el, y: -80, speed: 2 + Math.random() * 3 + (score / 100) });
+  }
+
+  function handleTap(el) {
+    if (lives <= 0) return;
+    if (el.dataset.type === 'glitch') {
+      score += 15;
+    } else {
+      lives -= 20; // Ошибка: тап по рабочему документу
+    }
+    removeEntity(el);
+    updateUI();
+    checkGameOver();
+  }
+
+  function gameLoop() {
+    if (lives <= 0) return;
+    for (let i = entities.length - 1; i >= 0; i--) {
+      let ent = entities[i];
+      ent.y += ent.speed;
+      ent.el.style.top = ent.y + 'px';
+      
+      if (ent.y > window.innerHeight) {
+        if (ent.el.dataset.type === 'glitch') {
+          lives -= 10; // Пропуск глюка
+          updateUI();
+          checkGameOver();
+        }
+        removeEntity(ent.el);
+      }
+    }
+    requestAnimationFrame(gameLoop);
+  }
+
+  function removeEntity(el) {
+    el.remove();
+    entities = entities.filter(e => e.el !== el);
+  }
+
+  function updateUI() {
+    document.getElementById('score').innerText = score;
+    document.getElementById('lives').innerText = Math.max(0, lives);
+  }
+
+  function checkGameOver() {
+    if (lives <= 0) {
+      clearInterval(gameInterval);
+      document.getElementById('game-over').style.display = 'block';
+      document.getElementById('final-score').innerText = score;
+    }
+  }
+
+  window.onload = startGame;
+</script>
+</body>
+</html>

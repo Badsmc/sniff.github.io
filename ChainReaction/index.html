@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alarm Chain Reaction</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #121212; overflow: hidden; font-family: sans-serif; touch-action: none; user-select: none; }
+        #gameCanvas { display: block; width: 100%; height: 100%; background: radial-gradient(circle at center, #2c3e50, #000000); }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; z-index: 10; }
+        
+        h1 { color: #bb86fc; margin-bottom: 10px; font-size: 2.2em; text-transform: uppercase; }
+        p { font-size: 1.1em; line-height: 1.4; max-width: 400px; margin: 10px 0; }
+        .rules { text-align: left; background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #bb86fc; }
+        
+        button { background: #bb86fc; color: #000; border: none; padding: 15px 30px; font-size: 1.2em; border-radius: 4px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; text-transform: uppercase; }
+        button:active { background: #9c27b0; }
+        
+        #ui { position: absolute; top: 15px; left: 15px; right: 15px; display: flex; justify-content: space-between; color: #bb86fc; font-weight: bold; font-size: 20px; z-index: 5; pointer-events: none; }
+        .hidden { display: none !important; }
+        
+        #levelMessage { position: absolute; top: 30%; width: 100%; text-align: center; color: #03dac6; font-size: 24px; font-weight: bold; z-index: 4; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="ui" class="hidden">
+        <div>Ур: <span id="levelDisplay">1</span></div>
+        <div>Цель: <span id="clearedCount">0</span>/<span id="targetCount">0</span></div>
+    </div>
+    
+    <div id="levelMessage">Уровень пройден!</div>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="startScreen" class="screen">
+        <h1>Chain Reaction</h1>
+        <div class="rules">
+            <p><strong>Смысл:</strong> Уничтожь будильники, чтобы поспать.</p>
+            <p><strong>Правила:</strong><br>👆 У тебя есть всего 1 тап на уровень.<br>💤 Тап создает "пузырь сна".<br>⏰ Будильник, задев пузырь, взрывается новым пузырем.<br>🎯 Уничтожь нужное количество для победы.</p>
+        </div>
+        <button id="startBtn">Поставить будильник</button>
+    </div>
+
+    <div id="gameOverScreen" class="screen hidden">
+        <h1>Пора вставать</h1>
+        <p>Недостаточно будильников уничтожено.</p>
+        <p style="font-size: 1.5em; color: #bb86fc; margin: 20px 0;">Достигнут уровень: <span id="finalScore">1</span></p>
+        <button id="restartBtn">Попробовать снова</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const screens = {
+            start: document.getElementById('startScreen'),
+            over: document.getElementById('gameOverScreen'),
+            ui: document.getElementById('ui')
+        };
+        const msgEl = document.getElementById('levelMessage');
+        
+        let width, height;
+        let isPlaying = false;
+        
+        // Состояние игры
+        let level = 1;
+        let totalAlarms = 0;
+        let targetScore = 0;
+        let clearedScore = 0;
+        let userTapped = false;
+        let levelInProgress = false;
+        
+        let alarms = [];
+        let bubbles = [];
+        
+        // Настройки физики
+        const alarmSize = 15;
+        const maxBubbleRadius = 50;
+        const bubbleGrowSpeed = 2;
+        const bubbleLifeTime = 60; // Кадры
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function initLevel() {
+            totalAlarms = 5 + level * 2;
+            targetScore = Math.floor(totalAlarms * 0.75); // Нужно уничтожить 75%
+            clearedScore = 0;
+            userTapped = false;
+            levelInProgress = true;
+            
+            alarms = [];
+            bubbles = [];
+            
+            for (let i = 0; i < totalAlarms; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1.5 + Math.random() * 1.5;
+                alarms.push({
+                    x: 50 + Math.random() * (width - 100),
+                    y: 50 + Math.random() * (height - 100),
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    active: true
+                });
+            }
+            
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('levelDisplay').textContent = level;
+            document.getElementById('clearedCount').textContent = clearedScore;
+            document.getElementById('targetCount').textContent = targetScore;
+        }
+
+        function startGame() {
+            level = 1;
+            screens.start.classList.add('hidden');
+            screens.over.classList.add('hidden');
+            screens.ui.classList.remove('hidden');
+            isPlaying = true;
+            initLevel();
+            requestAnimationFrame(update);
+        }
+
+        function spawnBubble(x, y) {
+            bubbles.push({
+                x: x,
+                y: y,
+                radius: 0,
+                state: 'growing', // growing, stable, shrinking
+                timer: bubbleLifeTime
+            });
+        }
+
+        function handleTap(x, y) {
+            if (!isPlaying || !levelInProgress || userTapped) return;
+            userTapped = true;
+            spawnBubble(x, y);
+        }
+
+        function update() {
+            if (!isPlaying) return;
+            ctx.clearRect(0, 0, width, height);
+
+            // Отрисовка и движение будильников
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            for (let i = alarms.length - 1; i >= 0; i--) {
+                let a = alarms[i];
+                if (!a.active) continue;
+
+                a.x += a.vx;
+                a.y += a.vy;
+
+                // Отскок от стен
+                if (a.x < alarmSize || a.x > width - alarmSize) a.vx *= -1;
+                if (a.y < alarmSize || a.y > height - alarmSize) a.vy *= -1;
+
+                ctx.fillText('⏰', a.x, a.y);
+            }
+
+            // Отрисовка и логика пузырей
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                let b = bubbles[i];
+                
+                if (b.state === 'growing') {
+                    b.radius += bubbleGrowSpeed;
+                    if (b.radius >= maxBubbleRadius) b.state = 'stable';
+                } else if (b.state === 'stable') {
+                    b.timer--;
+                    if (b.timer <= 0) b.state = 'shrinking';
+                } else if (b.state === 'shrinking') {
+                    b.radius -= bubbleGrowSpeed;
+                    if (b.radius <= 0) {
+                        bubbles.splice(i, 1);
+                        continue;
+                    }
+                }
+
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, Math.max(0, b.radius), 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(3, 218, 198, 0.4)';
+                ctx.fill();
+                ctx.strokeStyle = '#03dac6';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Проверка коллизий
+                for (let j = alarms.length - 1; j >= 0; j--) {
+                    let a = alarms[j];
+                    if (!a.active) continue;
+                    
+                    let dx = a.x - b.x;
+                    let dy = a.y - b.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < b.radius + alarmSize) {
+                        a.active = false;
+                        clearedScore++;
+                        updateUI();
+                        spawnBubble(a.x, a.y);
+                    }
+                }
+            }
+
+            // Проверка завершения уровня
+            if (userTapped && bubbles.length === 0 && levelInProgress) {
+                levelInProgress = false;
+                if (clearedScore >= targetScore) {
+                    // Успех
+                    msgEl.textContent = 'Уровень пройден!';
+                    msgEl.style.color = '#03dac6';
+                    msgEl.style.opacity = 1;
+                    setTimeout(() => {
+                        msgEl.style.opacity = 0;
+                        level++;
+                        initLevel();
+                    }, 1500);
+                } else {
+                    // Провал
+                    isPlaying = false;
+                    screens.ui.classList.add('hidden');
+                    screens.over.classList.remove('hidden');
+                    document.getElementById('finalScore').textContent = level;
+                }
+            }
+
+            if (isPlaying) {
+                requestAnimationFrame(update);
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => handleTap(e.clientX, e.clientY));
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleTap(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+    </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import time
 import requests
 from google import genai
 from telegram import Bot
@@ -17,7 +18,6 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def main():
-  # 1. Запрос к Gemini для создания игры
   prompt = (
       "Создай код HTML5 игры (один файл index.html с CSS и JS внутри) и"
       " новость о ней для Telegram. Верни строго в формате JSON без лишнего"
@@ -27,10 +27,22 @@ def main():
       " url), 'news_text' (короткий вовлекающий текст новости со ссылкой)."
   )
 
-  response = client.models.generate_content(
-      model="gemini-3.8-flash",
-      contents=prompt,
-  )
+  response = None
+  for attempt in range(3):
+    try:
+      response = client.models.generate_content(
+          model="gemini-3.8-flash", contents=prompt
+      )
+      break
+    except Exception as e:
+      if "503" in str(e) and attempt < 2:
+        print(
+            f"Сервер перегружен (503), попытка {attempt + 1} из 3. Повтор через"
+            " 10 секунд..."
+        )
+        time.sleep(10)
+        continue
+      raise e
 
   raw_text = response.text.strip()
   if raw_text.startswith("```json"):
@@ -42,13 +54,11 @@ def main():
   news_text = data["news_text"]
   new_game_entry = data["news_json_entry"]
 
-  # 2. Публикация файлов на GitHub
   headers = {
       "Authorization": f"Bearer {GITHUB_TOKEN}",
       "Accept": "application/vnd.github+json",
   }
 
-  # 2.1. Загрузка HTML игры
   encoded_html = base64.b64encode(html_code.encode("utf-8")).decode("utf-8")
   file_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/games/{dir_name}/index.html"
   requests.put(
@@ -60,7 +70,6 @@ def main():
       headers=headers,
   )
 
-  # 2.2. Обновление games.json
   json_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/games.json"
   res = requests.get(json_url, headers=headers)
   file_data = res.json()
@@ -84,7 +93,6 @@ def main():
       headers=headers,
   )
 
-  # 3. Получение актуального списка пользователей с PythonAnywhere
   users_res = requests.get(
       f"{PYTHONANYWHERE_URL}/get-users/{BROADCAST_SECRET}"
   )
@@ -94,7 +102,6 @@ def main():
 
   users = users_res.json()
 
-  # 4. Рассылка новости подписчикам
   for chat_id in users:
     try:
       bot.send_message(chat_id=chat_id, text=news_text, parse_mode="Markdown")

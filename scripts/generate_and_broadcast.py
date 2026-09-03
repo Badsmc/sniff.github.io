@@ -28,19 +28,19 @@ def main():
   )
 
   response = None
-  for attempt in range(3):
+  for attempt in range(5):
     try:
       response = client.models.generate_content(
-          model="gemini-3.8-flash", contents=prompt
+          model="gemini-3.6-flash", contents=prompt
       )
       break
     except Exception as e:
-      if "503" in str(e) and attempt < 2:
+      if "503" in str(e) and attempt < 4:
         print(
-            f"Сервер перегружен (503), попытка {attempt + 1} из 3. Повтор через"
-            " 10 секунд..."
+            f"Сервер перегружен (503), попытка {attempt + 1} из 5. Повтор через"
+            " 15 секунд..."
         )
-        time.sleep(10)
+        time.sleep(15)
         continue
       raise e
 

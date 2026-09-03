@@ -20,11 +20,13 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 def main():
   prompt = (
       "Создай код HTML5 игры (один файл index.html с CSS и JS внутри) и"
-      " новость о ней для Telegram. Верни строго в формате JSON без лишнего"
-      " текста со следующими ключами: 'dir_name' (название папки без пробелов,"
-      " англ), 'html_code' (полный код html), 'game_title' (название игры),"
-      " 'news_json_entry' (объект для games.json в виде словаря с полями title и"
-      " url), 'news_text' (короткий вовлекающий текст новости со ссылкой)."
+      " новость о ней для Telegram. Верни СТРОГО валидный JSON (без ошибок в кавычках,"
+      " экранируй переносы строк внутри кода) со следующими ключами: "
+      "'dir_name' (название папки без пробелов, англ), "
+      "'html_code' (полный код html), "
+      "'game_title' (название игры), "
+      "'news_json_entry' (объект для games.json в виде словаря с полями title и url), "
+      "'news_text' (короткий вовлекающий текст новости со ссылкой)."
   )
 
   response = None
@@ -36,19 +38,24 @@ def main():
       break
     except Exception as e:
       if "503" in str(e) and attempt < 4:
-        print(
-            f"Сервер перегружен (503), попытка {attempt + 1} из 5. Повтор через"
-            " 15 секунд..."
-        )
+        print(f"Сервер перегружен (503), попытка {attempt + 1} из 5. Повтор...")
         time.sleep(15)
         continue
       raise e
 
   raw_text = response.text.strip()
-  if raw_text.startswith("```json"):
-    raw_text = raw_text[7:-3].strip()
+  if "```json" in raw_text:
+    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+  elif "```" in raw_text:
+    raw_text = raw_text.split("```")[1].split("```")[0].strip()
 
-  data = json.loads(raw_text)
+  try:
+    data = json.loads(raw_text)
+  except json.JSONDecodeError as e:
+    print(f"Ошибка парсинга JSON: {e}")
+    print(f"Полученный текст от Gemini:\n{raw_text}")
+    raise e
+
   dir_name = data["dir_name"]
   html_code = data["html_code"]
   news_text = data["news_text"]
@@ -60,7 +67,7 @@ def main():
   }
 
   encoded_html = base64.b64encode(html_code.encode("utf-8")).decode("utf-8")
-  file_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/games/{dir_name}/index.html"
+  file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/games/{dir_name}/index.html"
   requests.put(
       file_url,
       json={
@@ -70,7 +77,7 @@ def main():
       headers=headers,
   )
 
-  json_url = f"[https://api.github.com/repos/](https://api.github.com/repos/){GITHUB_REPO}/contents/games.json"
+  json_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/games.json"
   res = requests.get(json_url, headers=headers)
   file_data = res.json()
   sha = file_data["sha"]
